@@ -1,6 +1,7 @@
 #include "state.h"
 #include <unistd.h>
 #include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 void state_init(AppState *state) {

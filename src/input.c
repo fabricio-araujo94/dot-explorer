@@ -9,14 +9,15 @@
 void input_handle(AppState *state, int ch) {
     int max_y, max_x;
     getmaxyx(stdscr, max_y, max_x);
+    (void)max_x;
     int list_height = max_y - 1;
 
     switch (ch) {
-        case KEY_QUIT:
+        case APP_KEY_QUIT:
             state->should_quit = true;
             break;
             
-        case KEY_UP_DIR:
+        case APP_KEY_UP_DIR:
         case KEY_UP:
             if (state->selected_index > 0) {
                 state->selected_index--;
@@ -26,7 +27,7 @@ void input_handle(AppState *state, int ch) {
             }
             break;
 
-        case KEY_DOWN_DIR:
+        case APP_KEY_DOWN_DIR:
         case KEY_DOWN:
             if (state->selected_index < state->dir_list.count - 1) {
                 state->selected_index++;
@@ -36,7 +37,7 @@ void input_handle(AppState *state, int ch) {
             }
             break;
 
-        case KEY_ENTER_DIR:
+        case APP_KEY_ENTER_DIR:
         case KEY_RIGHT:
             if (state->dir_list.count > 0) {
                 const FileEntry *entry = &state->dir_list.entries[state->selected_index];
@@ -46,16 +47,16 @@ void input_handle(AppState *state, int ch) {
             }
             break;
 
-        case KEY_BACK_DIR:
+        case APP_KEY_BACK_DIR:
         case KEY_LEFT:
             state_change_dir(state, "..");
             break;
             
-        case KEY_REFRESH:
+        case APP_KEY_REFRESH:
             state_change_dir(state, ".");
             break;
 
-        case KEY_SELECT:
+        case APP_KEY_SELECT:
             if (state->dir_list.count > 0) {
                 FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 entry->is_selected = !entry->is_selected;
@@ -68,12 +69,12 @@ void input_handle(AppState *state, int ch) {
             }
             break;
 
-        case KEY_DELETE_ITEM:
+        case APP_KEY_DELETE_ITEM:
             if (state->dir_list.count > 0) {
                 char buf[256];
                 if (ui_prompt("Delete item? (y/n): ", buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
                     FileEntry *entry = &state->dir_list.entries[state->selected_index];
-                    char full_path[1024];
+                    char full_path[PATH_MAX];
                     snprintf(full_path, sizeof(full_path), "%s/%s", state->current_path, entry->name);
                     fs_delete(full_path);
                     state_change_dir(state, ".");
@@ -81,12 +82,12 @@ void input_handle(AppState *state, int ch) {
             }
             break;
 
-        case KEY_RENAME_ITEM:
+        case APP_KEY_RENAME_ITEM:
             if (state->dir_list.count > 0) {
                 char new_name[256];
                 if (ui_prompt("New name: ", new_name, sizeof(new_name))) {
                     FileEntry *entry = &state->dir_list.entries[state->selected_index];
-                    char old_path[1024], new_path[1024];
+                    char old_path[PATH_MAX], new_path[PATH_MAX];
                     snprintf(old_path, sizeof(old_path), "%s/%s", state->current_path, entry->name);
                     snprintf(new_path, sizeof(new_path), "%s/%s", state->current_path, new_name);
                     fs_rename(old_path, new_path);
@@ -95,11 +96,11 @@ void input_handle(AppState *state, int ch) {
             }
             break;
 
-        case KEY_CREATE_FILE:
+        case APP_KEY_CREATE_FILE:
             {
                 char name[256];
                 if (ui_prompt("New file name: ", name, sizeof(name))) {
-                    char full_path[1024];
+                    char full_path[PATH_MAX];
                     snprintf(full_path, sizeof(full_path), "%s/%s", state->current_path, name);
                     fs_create_file(full_path);
                     state_change_dir(state, ".");
@@ -107,11 +108,11 @@ void input_handle(AppState *state, int ch) {
             }
             break;
 
-        case KEY_CREATE_DIR:
+        case APP_KEY_CREATE_DIR:
             {
                 char name[256];
                 if (ui_prompt("New directory name: ", name, sizeof(name))) {
-                    char full_path[1024];
+                    char full_path[PATH_MAX];
                     snprintf(full_path, sizeof(full_path), "%s/%s", state->current_path, name);
                     fs_create_dir(full_path);
                     state_change_dir(state, ".");
@@ -119,22 +120,22 @@ void input_handle(AppState *state, int ch) {
             }
             break;
 
-        case KEY_SORT_NAME:
+        case APP_KEY_SORT_NAME:
             state->sort_type = SORT_NAME;
             fs_sort_dir_list(&state->dir_list, state->sort_type);
             break;
 
-        case KEY_SORT_SIZE:
+        case APP_KEY_SORT_SIZE:
             state->sort_type = SORT_SIZE;
             fs_sort_dir_list(&state->dir_list, state->sort_type);
             break;
 
-        case KEY_SORT_DATE:
+        case APP_KEY_SORT_DATE:
             state->sort_type = SORT_DATE;
             fs_sort_dir_list(&state->dir_list, state->sort_type);
             break;
 
-        case KEY_COPY:
+        case APP_KEY_COPY:
             if (state->dir_list.count > 0) {
                 FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 snprintf(state->clipboard_path, sizeof(state->clipboard_path), "%s/%s", state->current_path, entry->name);
@@ -142,7 +143,7 @@ void input_handle(AppState *state, int ch) {
             }
             break;
 
-        case KEY_CUT:
+        case APP_KEY_CUT:
             if (state->dir_list.count > 0) {
                 FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 snprintf(state->clipboard_path, sizeof(state->clipboard_path), "%s/%s", state->current_path, entry->name);
@@ -150,7 +151,7 @@ void input_handle(AppState *state, int ch) {
             }
             break;
 
-        case KEY_PASTE:
+        case APP_KEY_PASTE:
             if (state->clipboard_op != CLIPBOARD_NONE && strlen(state->clipboard_path) > 0) {
                 // Extract filename from clipboard path
                 const char *filename = strrchr(state->clipboard_path, '/');
@@ -160,7 +161,7 @@ void input_handle(AppState *state, int ch) {
                     filename = state->clipboard_path;
                 }
 
-                char dest_path[1024];
+                char dest_path[PATH_MAX];
                 snprintf(dest_path, sizeof(dest_path), "%s/%s", state->current_path, filename);
 
                 if (state->clipboard_op == CLIPBOARD_COPY) {
@@ -174,7 +175,7 @@ void input_handle(AppState *state, int ch) {
             }
             break;
 
-        case KEY_PROPERTIES:
+        case APP_KEY_PROPERTIES:
             if (state->dir_list.count > 0) {
                 FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 char size_str[64];

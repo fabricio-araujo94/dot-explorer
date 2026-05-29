@@ -4,6 +4,7 @@
 #include <string.h>
 #include <strings.h>
 #include <dirent.h>
+#include <limits.h>
 
 void fs_init_dir_list(DirectoryList *list) {
     list->count = 0;
@@ -55,7 +56,7 @@ bool fs_read_dir(const char *path, DirectoryList *list) {
 
     list->count = 0;
     struct dirent *dp;
-    char full_path[1024];
+    char full_path[PATH_MAX];
 
     while ((dp = readdir(dir)) != NULL) {
         if (strcmp(dp->d_name, ".") == 0) continue;
