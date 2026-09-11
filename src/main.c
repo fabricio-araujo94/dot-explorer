@@ -8,6 +8,7 @@ int main(void) {
 
     ui_init();
     ui_dual_init(&dual_pane);
+    timeout(100);
 
     while (!dual_pane.panes[dual_pane.active_pane_index].state.should_quit) {
         ui_draw(&dual_pane);

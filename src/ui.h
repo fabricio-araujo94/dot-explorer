@@ -2,6 +2,7 @@
 #define UI_H
 
 #include "state.h"
+#include "task.h"
 #include <ncurses.h>
 
 typedef struct {
@@ -17,6 +18,7 @@ typedef struct {
 typedef struct {
 	Pane panes[2];
 	int active_pane_index;
+	Task task;
 } DualPaneUI;
 
 void ui_init(void);

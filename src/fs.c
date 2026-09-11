@@ -103,11 +103,13 @@ static bool remove_tree(const char *path, char *error_path, size_t error_path_si
 
 static bool copy_regular_file(const char *src_path, const char *dest_path,
                               const struct stat *source_stat,
+                              const FsCopyOptions *options,
                               char *error_path, size_t error_path_size) {
     FILE *src = NULL;
     FILE *dest = NULL;
     char buffer[8192];
     size_t bytes;
+    uint64_t copied = 0;
     bool success = true;
     bool read_error;
     bool source_closed;
@@ -131,7 +133,21 @@ static bool copy_regular_file(const char *src_path, const char *dest_path,
         return false;
     }
     while ((bytes = fread(buffer, 1, sizeof(buffer), src)) > 0) {
+        if (options && options->is_cancelled &&
+            options->is_cancelled(options->progress_context)) {
+            errno = ECANCELED;
+            success = false;
+            break;
+        }
         if (fwrite(buffer, 1, bytes, dest) != bytes) {
+            success = false;
+            break;
+        }
+        copied += bytes;
+        if (options && options->progress &&
+            !options->progress(copied, (uint64_t)source_stat->st_size,
+                               options->progress_context)) {
+            errno = ECANCELED;
             success = false;
             break;
         }
@@ -222,6 +238,13 @@ static bool copy_tree(const char *src_path, const char *dest_path,
         while ((entry = readdir(dir)) != NULL) {
             char source_child[PATH_MAX];
             char dest_child[PATH_MAX];
+            if (options && options->is_cancelled &&
+                options->is_cancelled(options->progress_context)) {
+                closedir(dir);
+                errno = ECANCELED;
+                set_error_path(error_path, error_path_size, src_path);
+                return false;
+            }
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
                 continue;
             }
@@ -247,7 +270,7 @@ static bool copy_tree(const char *src_path, const char *dest_path,
         return true;
     }
     if (S_ISREG(source_stat.st_mode)) {
-        return copy_regular_file(src_path, dest_path, &source_stat,
+        return copy_regular_file(src_path, dest_path, &source_stat, options,
                                  error_path, error_path_size);
     }
     set_error_path(error_path, error_path_size, src_path);
@@ -383,14 +406,14 @@ bool fs_rename(const char *old_path, const char *new_path) {
 }
 
 bool fs_copy(const char *src_path, const char *dest_path) {
-    FsCopyOptions options = { false, true };
+    FsCopyOptions options = { false, true, NULL, NULL, NULL };
     char error_path[PATH_MAX];
     return fs_copy_recursive_with_options(src_path, dest_path, &options,
                                           error_path, sizeof(error_path));
 }
 
 bool fs_copy_recursive(const char *src_path, const char *dest_path) {
-    FsCopyOptions options = { false, true };
+    FsCopyOptions options = { false, true, NULL, NULL, NULL };
     char error_path[PATH_MAX];
     return fs_copy_recursive_with_options(src_path, dest_path, &options,
                                           error_path, sizeof(error_path));
@@ -401,7 +424,7 @@ bool fs_copy_recursive_with_options(const char *src_path, const char *dest_path,
                                     char *error_path, size_t error_path_size) {
     struct stat destination_stat;
     bool destination_existed;
-    FsCopyOptions defaults = { false, true };
+    FsCopyOptions defaults = { false, true, NULL, NULL, NULL };
     const FsCopyOptions *effective_options = options ? options : &defaults;
 
     if (!src_path || !dest_path || !*src_path || !*dest_path ||

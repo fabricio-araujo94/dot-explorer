@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700 -g -I./include -I./src
-LDFLAGS = -lncurses
+LDFLAGS = -lncurses -pthread
 
 SRC_DIR = src
 OBJ_DIR = obj

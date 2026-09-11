@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 typedef struct {
     char name[256];
@@ -31,6 +32,9 @@ typedef enum {
 typedef struct {
     bool follow_symlinks;
     bool rollback_on_error;
+    bool (*progress)(uint64_t bytes_copied, uint64_t total_bytes, void *context);
+    bool (*is_cancelled)(void *context);
+    void *progress_context;
 } FsCopyOptions;
 
 void fs_init_dir_list(DirectoryList *list);

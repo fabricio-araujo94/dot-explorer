@@ -218,9 +218,11 @@ void ui_dual_init(DualPaneUI *ui) {
     pane_sync(&ui->panes[0]);
     pane_sync(&ui->panes[1]);
     ui->active_pane_index = 0;
+    task_init(&ui->task);
 }
 
 void ui_dual_cleanup(DualPaneUI *ui) {
+    task_cleanup(&ui->task);
     state_cleanup(&ui->panes[0].state);
     state_cleanup(&ui->panes[1].state);
 }
@@ -245,6 +247,29 @@ void ui_draw(DualPaneUI *ui) {
     erase();
     draw_pane(&ui->panes[0], ui->active_pane_index == 0);
     draw_pane(&ui->panes[1], ui->active_pane_index == 1);
+    {
+        TaskStatus status;
+        uint64_t copied, total;
+        char error_path[PATH_MAX];
+        task_snapshot(&ui->task, &status, &copied, &total,
+                      error_path, sizeof(error_path));
+        if (status == TASK_RUNNING) {
+            int width = max_x > 4 ? max_x - 4 : 1;
+            int filled = total > 0 ? (int)((copied * (uint64_t)width) / total) : 0;
+            if (filled > width) filled = width;
+            mvprintw(max_y - 1, 1, "Copy [");
+            mvhline(max_y - 1, 7, '#', filled);
+            mvhline(max_y - 1, 7 + filled, '-', width - filled);
+            mvprintw(max_y - 1, 8 + width, "] Esc cancel");
+        } else if (status == TASK_FAILED) {
+            mvprintw(max_y - 1, 1, "Copy failed: %.*s", max_x - 3, error_path);
+        } else if (status == TASK_CANCELLED) {
+            mvprintw(max_y - 1, 1, "Copy cancelled");
+        }
+        if (status != TASK_RUNNING && status != TASK_IDLE && ui->task.thread_started) {
+            task_reap(&ui->task);
+        }
+    }
     refresh();
 }
 
@@ -252,11 +277,27 @@ void ui_handle_input(DualPaneUI *ui, int ch) {
     Pane *active = &ui->panes[ui->active_pane_index];
     Pane *other = &ui->panes[1 - ui->active_pane_index];
 
+    if (task_is_running(&ui->task)) {
+        if (ch == 27) task_request_cancel(&ui->task);
+        return;
+    }
+
     if (ch == '\t') {
         ui->active_pane_index = 1 - ui->active_pane_index;
         return;
     }
     if (ch == KEY_PASTE && active->state.clipboard.count > 0) {
+        if (!active->state.clipboard.is_cut && active->state.clipboard.count == 1) {
+            char destination[PATH_MAX];
+            const char *source = active->state.clipboard.paths[0];
+            const char *name = strrchr(source, '/');
+            name = name ? name + 1 : source;
+            if (utils_join_path(destination, sizeof(destination),
+                                other->state.current_path, name) &&
+                task_start_copy(&ui->task, source, destination)) {
+                return;
+            }
+        }
         char error_path[PATH_MAX];
         if (!clipboard_apply_operation(&active->state.clipboard,
                                        other->state.current_path,
