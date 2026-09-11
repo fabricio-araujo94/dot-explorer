@@ -2,6 +2,8 @@
 
 Um gerenciador de arquivos para terminal rápido, leve e moderno, escrito em C usando `ncurses`.
 
+> ATENÇÃO: este programa não foi suficientemente testado e a execução de certas funcionalidades podem ter efeitos diversos. Recomenda-se cautela e o uso num ambiente isolado.
+
 ## Recursos
 
 - Navegação por teclado.
