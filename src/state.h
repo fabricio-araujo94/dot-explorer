@@ -8,11 +8,13 @@
 #define PATH_MAX 4096
 #endif
 
-typedef enum {
-    CLIPBOARD_NONE,
-    CLIPBOARD_COPY,
-    CLIPBOARD_CUT
-} ClipboardOp;
+typedef struct {
+    char **paths;
+    size_t count;
+    size_t capacity;
+    bool is_cut;
+    char source_dir[PATH_MAX];
+} Clipboard;
 
 typedef struct {
     char current_path[PATH_MAX];
@@ -22,12 +24,16 @@ typedef struct {
     bool should_quit;
     SortType sort_type;
 
-    char clipboard_path[PATH_MAX];
-    ClipboardOp clipboard_op;
+    Clipboard clipboard;
 } AppState;
 
 void state_init(AppState *state);
 void state_cleanup(AppState *state);
 void state_change_dir(AppState *state, const char *new_path);
+bool clipboard_add_entry(Clipboard *clipboard, const char *path);
+void clipboard_clear(Clipboard *clipboard);
+void clipboard_invert_selection(DirectoryList *list);
+bool clipboard_apply_operation(Clipboard *clipboard, const char *destination_dir,
+                               char *error_path, size_t error_path_size);
 
 #endif // STATE_H

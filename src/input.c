@@ -2,9 +2,39 @@
 #include "config.h"
 #include "ui.h"
 #include "utils.h"
+#include <limits.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+
+static bool capture_clipboard(AppState *state, bool is_cut) {
+    bool has_selected = false;
+
+    clipboard_clear(&state->clipboard);
+    for (int i = 0; i < state->dir_list.count; ++i) {
+        if (state->dir_list.entries[i].is_selected) {
+            has_selected = true;
+            break;
+        }
+    }
+    for (int i = 0; i < state->dir_list.count; ++i) {
+        char path[PATH_MAX];
+        if (has_selected && !state->dir_list.entries[i].is_selected) {
+            continue;
+        }
+        if (!has_selected && i != state->selected_index) {
+            continue;
+        }
+        if (!utils_join_path(path, sizeof(path), state->current_path,
+                             state->dir_list.entries[i].name) ||
+            !clipboard_add_entry(&state->clipboard, path)) {
+            clipboard_clear(&state->clipboard);
+            return false;
+        }
+    }
+    state->clipboard.is_cut = is_cut;
+    return state->clipboard.count > 0;
+}
 
 void input_handle(AppState *state, int ch) {
     int max_y, max_x;
@@ -136,39 +166,22 @@ void input_handle(AppState *state, int ch) {
 
         case KEY_COPY:
             if (state->dir_list.count > 0) {
-                FileEntry *entry = &state->dir_list.entries[state->selected_index];
-                snprintf(state->clipboard_path, sizeof(state->clipboard_path), "%s/%s", state->current_path, entry->name);
-                state->clipboard_op = CLIPBOARD_COPY;
+                capture_clipboard(state, false);
             }
             break;
 
         case KEY_CUT:
             if (state->dir_list.count > 0) {
-                FileEntry *entry = &state->dir_list.entries[state->selected_index];
-                snprintf(state->clipboard_path, sizeof(state->clipboard_path), "%s/%s", state->current_path, entry->name);
-                state->clipboard_op = CLIPBOARD_CUT;
+                capture_clipboard(state, true);
             }
             break;
 
         case KEY_PASTE:
-            if (state->clipboard_op != CLIPBOARD_NONE && strlen(state->clipboard_path) > 0) {
-                // Extract filename from clipboard path
-                const char *filename = strrchr(state->clipboard_path, '/');
-                if (filename) {
-                    filename++; // Skip '/'
-                } else {
-                    filename = state->clipboard_path;
-                }
-
-                char dest_path[1024];
-                snprintf(dest_path, sizeof(dest_path), "%s/%s", state->current_path, filename);
-
-                if (state->clipboard_op == CLIPBOARD_COPY) {
-                    fs_copy(state->clipboard_path, dest_path);
-                } else if (state->clipboard_op == CLIPBOARD_CUT) {
-                    fs_rename(state->clipboard_path, dest_path);
-                    state->clipboard_op = CLIPBOARD_NONE;
-                    state->clipboard_path[0] = '\0';
+            if (state->clipboard.count > 0) {
+                char error_path[PATH_MAX];
+                if (!clipboard_apply_operation(&state->clipboard, state->current_path,
+                                               error_path, sizeof(error_path))) {
+                    ui_show_message("Paste failed", error_path);
                 }
                 state_change_dir(state, ".");
             }
