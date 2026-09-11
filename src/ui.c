@@ -1,5 +1,7 @@
 #include "ui.h"
+#include "input.h"
 #include "config.h"
+#include "utils.h"
 #include <limits.h>
 #include <string.h>
 #include <stdio.h>
@@ -147,5 +149,111 @@ void ui_show_message(const char *title, const char *message) {
     wrefresh(win);
     wgetch(win);
     delwin(win);
+}
+
+static void pane_sync(Pane *pane) {
+    snprintf(pane->cwd, sizeof(pane->cwd), "%s", pane->state.current_path);
+    pane->selected_index = pane->state.selected_index;
+}
+
+static void draw_pane(const Pane *pane, bool active) {
+    int list_height = pane->height - 2;
+    int visible_count = state_visible_count(&pane->state);
+    int content_width = pane->width - 2;
+
+    if (pane->width < 4 || pane->height < 3) return;
+    attron(active ? (COLOR_PAIR(3) | A_BOLD) : COLOR_PAIR(2));
+    mvaddch(pane->y, pane->x, ACS_ULCORNER);
+    mvaddch(pane->y, pane->x + pane->width - 1, ACS_URCORNER);
+    mvaddch(pane->y + pane->height - 1, pane->x, ACS_LLCORNER);
+    mvaddch(pane->y + pane->height - 1, pane->x + pane->width - 1, ACS_LRCORNER);
+    mvhline(pane->y, pane->x + 1, ACS_HLINE, pane->width - 2);
+    mvhline(pane->y + pane->height - 1, pane->x + 1, ACS_HLINE, pane->width - 2);
+    mvvline(pane->y + 1, pane->x, ACS_VLINE, pane->height - 2);
+    mvvline(pane->y + 1, pane->x + pane->width - 1, ACS_VLINE, pane->height - 2);
+    attroff(active ? (COLOR_PAIR(3) | A_BOLD) : COLOR_PAIR(2));
+
+    for (int row = 0; row < list_height &&
+                       row + pane->state.scroll_offset < visible_count; ++row) {
+        int view_index = row + pane->state.scroll_offset;
+        int original_index = state_visible_index(&pane->state, view_index);
+        const FileEntry *entry = &pane->state.dir_list.entries[original_index];
+        int screen_y = pane->y + row + 1;
+        bool cursor = original_index == pane->state.selected_index;
+        attr_t attributes = cursor ? (COLOR_PAIR(3) | A_BOLD) :
+                            (entry->is_dir ? (COLOR_PAIR(1) | A_BOLD) : COLOR_PAIR(2));
+        char line[PATH_MAX];
+
+        snprintf(line, sizeof(line), "%c%c %s", entry->is_selected ? '*' : ' ',
+                 entry->is_dir ? '/' : ' ', entry->name);
+        attron(attributes);
+        mvhline(screen_y, pane->x + 1, ' ', content_width);
+        mvaddnstr(screen_y, pane->x + 1, line, content_width);
+        attroff(attributes);
+    }
+    attron(active ? (COLOR_PAIR(3) | A_BOLD) : COLOR_PAIR(2));
+    mvaddnstr(pane->y + pane->height - 1, pane->x + 2, pane->cwd,
+              pane->width - 4);
+    attroff(active ? (COLOR_PAIR(3) | A_BOLD) : COLOR_PAIR(2));
+}
+
+void ui_dual_init(DualPaneUI *ui) {
+    memset(ui, 0, sizeof(*ui));
+    state_init(&ui->panes[0].state);
+    state_init(&ui->panes[1].state);
+    pane_sync(&ui->panes[0]);
+    pane_sync(&ui->panes[1]);
+    ui->active_pane_index = 0;
+}
+
+void ui_dual_cleanup(DualPaneUI *ui) {
+    state_cleanup(&ui->panes[0].state);
+    state_cleanup(&ui->panes[1].state);
+}
+
+void ui_draw(DualPaneUI *ui) {
+    int max_y, max_x;
+    int left_width;
+    getmaxyx(stdscr, max_y, max_x);
+    left_width = max_x / 2;
+
+    ui->panes[0].x = 0;
+    ui->panes[0].y = 0;
+    ui->panes[0].width = left_width;
+    ui->panes[0].height = max_y;
+    ui->panes[1].x = left_width;
+    ui->panes[1].y = 0;
+    ui->panes[1].width = max_x - left_width;
+    ui->panes[1].height = max_y;
+    pane_sync(&ui->panes[0]);
+    pane_sync(&ui->panes[1]);
+
+    erase();
+    draw_pane(&ui->panes[0], ui->active_pane_index == 0);
+    draw_pane(&ui->panes[1], ui->active_pane_index == 1);
+    refresh();
+}
+
+void ui_handle_input(DualPaneUI *ui, int ch) {
+    Pane *active = &ui->panes[ui->active_pane_index];
+    Pane *other = &ui->panes[1 - ui->active_pane_index];
+
+    if (ch == '\t') {
+        ui->active_pane_index = 1 - ui->active_pane_index;
+        return;
+    }
+    if (ch == KEY_PASTE && active->state.clipboard.count > 0) {
+        char error_path[PATH_MAX];
+        if (!clipboard_apply_operation(&active->state.clipboard,
+                                       other->state.current_path,
+                                       error_path, sizeof(error_path))) {
+            ui_show_message("Paste failed", error_path);
+        }
+        state_change_dir(&other->state, ".");
+        pane_sync(other);
+        return;
+    }
+    input_handle(&active->state, ch);
+    pane_sync(active);
 }
 

@@ -4,20 +4,20 @@
 #include <ncurses.h>
 
 int main(void) {
-    AppState state;
-    state_init(&state);
+    DualPaneUI dual_pane;
 
     ui_init();
+    ui_dual_init(&dual_pane);
 
-    while (!state.should_quit) {
-        ui_render(&state);
+    while (!dual_pane.panes[dual_pane.active_pane_index].state.should_quit) {
+        ui_draw(&dual_pane);
         
         int ch = getch();
-        input_handle(&state, ch);
+        ui_handle_input(&dual_pane, ch);
     }
 
+    ui_dual_cleanup(&dual_pane);
     ui_cleanup();
-    state_cleanup(&state);
 
     return 0;
 }
