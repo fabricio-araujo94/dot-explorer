@@ -8,6 +8,33 @@
 #include <time.h>
 #include <ctype.h>
 
+static int escape_sequence_state;
+
+static void navigate_history(AppState *state, bool forward) {
+    char path[PATH_MAX];
+    int selected_index;
+    bool restored;
+
+    if (forward) {
+        restored = history_pop_forward(state, path, sizeof(path), &selected_index);
+    } else {
+        restored = history_pop_back(state, path, sizeof(path), &selected_index);
+    }
+    if (!restored) {
+        return;
+    }
+    state_change_dir(state, path);
+    if (state->dir_list.count > 0) {
+        if (selected_index < 0) selected_index = 0;
+        if (selected_index >= state->dir_list.count) {
+            selected_index = state->dir_list.count - 1;
+        }
+        state->selected_index = selected_index;
+    } else {
+        state->selected_index = 0;
+    }
+}
+
 static int current_view_index(const AppState *state) {
     if (!state->filter_active) return state->selected_index;
     for (int i = 0; i < state->filtered_entries.count; ++i) {
@@ -216,6 +243,28 @@ void input_handle(AppState *state, int ch) {
     (void)max_x;
     int list_height = max_y - 1;
 
+    if (escape_sequence_state == 0 && ch == 27) {
+        escape_sequence_state = 1;
+        return;
+    }
+    if (escape_sequence_state == 1) {
+        if (ch == '[') {
+            escape_sequence_state = 2;
+            return;
+        }
+        escape_sequence_state = 0;
+    } else if (escape_sequence_state == 2) {
+        escape_sequence_state = 0;
+        if (ch == 'D') {
+            navigate_history(state, false);
+            return;
+        }
+        if (ch == 'C') {
+            navigate_history(state, true);
+            return;
+        }
+    }
+
     switch (ch) {
         case KEY_QUIT:
             state->should_quit = true;
@@ -240,6 +289,7 @@ void input_handle(AppState *state, int ch) {
             if (state->dir_list.count > 0) {
                 const FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 if (entry->is_dir) {
+                    history_push(state, state->current_path, state->selected_index);
                     state_change_dir(state, entry->name);
                 } else {
                     char path[PATH_MAX];
@@ -255,7 +305,16 @@ void input_handle(AppState *state, int ch) {
 
         case KEY_BACK_DIR:
         case KEY_LEFT:
+        case KEY_BACKSPACE:
             state_change_dir(state, "..");
+            break;
+
+        case 15:
+            navigate_history(state, false);
+            break;
+
+        case 9:
+            navigate_history(state, true);
             break;
             
         case KEY_REFRESH:

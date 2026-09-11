@@ -89,6 +89,100 @@ static const char *path_basename(const char *path) {
     return separator ? separator + 1 : path;
 }
 
+static void history_clear_stack(HistoryEntry **entries, size_t *count,
+                                size_t *capacity) {
+    free(*entries);
+    *entries = NULL;
+    *count = 0;
+    *capacity = 0;
+}
+
+static bool history_stack_push(HistoryEntry **entries, size_t *count,
+                               size_t *capacity, const char *path,
+                               int selected_index) {
+    HistoryEntry *new_entries;
+    size_t new_capacity;
+    if (*count == *capacity) {
+        new_capacity = *capacity == 0 ? 16 : *capacity * 2;
+        new_entries = realloc(*entries, new_capacity * sizeof(*new_entries));
+        if (!new_entries) {
+            errno = ENOMEM;
+            return false;
+        }
+        *entries = new_entries;
+        *capacity = new_capacity;
+    }
+    if (snprintf((*entries)[*count].path, PATH_MAX, "%s", path) >= PATH_MAX) {
+        errno = ENAMETOOLONG;
+        return false;
+    }
+    (*entries)[*count].selected_index = selected_index;
+    (*count)++;
+    return true;
+}
+
+static bool history_pop_stack(HistoryEntry *entries, size_t *count,
+                              char *path, size_t path_size, int *selected_index) {
+    HistoryEntry *entry;
+    if (!entries || !count || *count == 0 || !path || path_size == 0 ||
+        !selected_index) {
+        errno = ENOENT;
+        return false;
+    }
+    entry = &entries[*count - 1];
+    if (snprintf(path, path_size, "%s", entry->path) >= (int)path_size) {
+        errno = ENAMETOOLONG;
+        return false;
+    }
+    *selected_index = entry->selected_index;
+    (*count)--;
+    return true;
+}
+
+bool history_push(AppState *state, const char *path, int selected_index) {
+    if (!state || !path || !*path) {
+        errno = EINVAL;
+        return false;
+    }
+    if (!history_stack_push(&state->history.back, &state->history.back_count,
+                            &state->history.back_capacity, path, selected_index)) {
+        return false;
+    }
+    history_clear_stack(&state->history.forward, &state->history.forward_count,
+                        &state->history.forward_capacity);
+    return true;
+}
+
+bool history_pop_back(AppState *state, char *path, size_t path_size,
+                      int *selected_index) {
+    if (!state || state->history.back_count == 0) {
+        errno = ENOENT;
+        return false;
+    }
+    if (!history_stack_push(&state->history.forward, &state->history.forward_count,
+                            &state->history.forward_capacity, state->current_path,
+                            state->selected_index)) {
+        return false;
+    }
+    return history_pop_stack(state->history.back, &state->history.back_count,
+                             path, path_size, selected_index);
+}
+
+bool history_pop_forward(AppState *state, char *path, size_t path_size,
+                         int *selected_index) {
+    if (!state || state->history.forward_count == 0) {
+        errno = ENOENT;
+        return false;
+    }
+    if (!history_stack_push(&state->history.back, &state->history.back_count,
+                            &state->history.back_capacity, state->current_path,
+                            state->selected_index)) {
+        return false;
+    }
+    return history_pop_stack(state->history.forward, &state->history.forward_count,
+                             path, path_size, selected_index);
+}
+
 static bool ensure_clipboard_capacity(Clipboard *clipboard) {
     size_t new_capacity;
     char **new_paths;
@@ -237,6 +331,7 @@ void state_init(AppState *state) {
     state->filter_active = false;
     state->filter_query[0] = '\0';
     memset(&state->clipboard, 0, sizeof(state->clipboard));
+    memset(&state->history, 0, sizeof(state->history));
 
     fs_read_dir(state->current_path, &state->dir_list);
     fs_sort_dir_list(&state->dir_list, state->sort_type);
@@ -245,6 +340,10 @@ void state_init(AppState *state) {
 void state_cleanup(AppState *state) {
     entry_list_clear(&state->filtered_entries);
     clipboard_clear(&state->clipboard);
+    history_clear_stack(&state->history.back, &state->history.back_count,
+                        &state->history.back_capacity);
+    history_clear_stack(&state->history.forward, &state->history.forward_count,
+                        &state->history.forward_capacity);
     fs_free_dir_list(&state->dir_list);
 }
 void state_change_dir(AppState *state, const char *new_path) {

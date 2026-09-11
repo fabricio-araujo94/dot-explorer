@@ -17,6 +17,20 @@ typedef struct {
 } Clipboard;
 
 typedef struct {
+    char path[PATH_MAX];
+    int selected_index;
+} HistoryEntry;
+
+typedef struct {
+    HistoryEntry *back;
+    size_t back_count;
+    size_t back_capacity;
+    HistoryEntry *forward;
+    size_t forward_count;
+    size_t forward_capacity;
+} NavigationHistory;
+
+typedef struct {
     int *indices;
     int count;
     int capacity;
@@ -34,6 +48,7 @@ typedef struct {
     char filter_query[256];
 
     Clipboard clipboard;
+    NavigationHistory history;
 } AppState;
 
 void state_init(AppState *state);
@@ -48,5 +63,10 @@ void clipboard_clear(Clipboard *clipboard);
 void clipboard_invert_selection(DirectoryList *list);
 bool clipboard_apply_operation(Clipboard *clipboard, const char *destination_dir,
                                char *error_path, size_t error_path_size);
+bool history_push(AppState *state, const char *path, int selected_index);
+bool history_pop_back(AppState *state, char *path, size_t path_size,
+                      int *selected_index);
+bool history_pop_forward(AppState *state, char *path, size_t path_size,
+                         int *selected_index);
 
 #endif // STATE_H
