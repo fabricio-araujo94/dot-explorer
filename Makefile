@@ -8,8 +8,15 @@ OBJ_DIR = obj
 SRCS = $(wildcard $(SRC_DIR)/*.c) $(wildcard $(SRC_DIR)/utils/*.c)
 OBJS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRCS))
 TARGET = dot-explorer
+TEST_TARGET = test_fs
 
 all: $(TARGET)
+
+test: $(TEST_TARGET)
+	./$(TEST_TARGET)
+
+$(TEST_TARGET): tests/test_fs.c src/fs.c src/utils.c
+	$(CC) $(CFLAGS) tests/test_fs.c src/fs.c src/utils.c -o $@
 
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS)
@@ -23,6 +30,6 @@ $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)/utils
 
 clean:
-	rm -rf $(OBJ_DIR) $(TARGET)
+	rm -rf $(OBJ_DIR) $(TARGET) $(TEST_TARGET)
 
-.PHONY: all clean
+.PHONY: all test clean

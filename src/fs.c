@@ -58,6 +58,43 @@ static bool parent_is_writable(const char *path) {
     return access(parent, W_OK | X_OK) == 0;
 }
 
+static bool destination_is_inside_source(const char *source, const char *destination) {
+    struct stat source_stat;
+    char source_real[PATH_MAX];
+    char parent[PATH_MAX];
+    char parent_real[PATH_MAX];
+    char *separator;
+    size_t source_length;
+
+    if (lstat(source, &source_stat) != 0 || !S_ISDIR(source_stat.st_mode) ||
+        !platform_realpath(source, source_real, sizeof(source_real)) ||
+        strlen(destination) >= sizeof(parent)) {
+        return false;
+    }
+    strcpy(parent, destination);
+    separator = strrchr(parent, '/');
+#ifdef _WIN32
+    {
+        char *backslash = strrchr(parent, '\\');
+        if (backslash && (!separator || backslash > separator)) separator = backslash;
+    }
+#endif
+    if (!separator) {
+        strcpy(parent, ".");
+    } else if (separator == parent) {
+        separator[1] = '\0';
+    } else {
+        *separator = '\0';
+    }
+    if (!platform_realpath(parent, parent_real, sizeof(parent_real))) {
+        return false;
+    }
+    source_length = strlen(source_real);
+    return strncmp(parent_real, source_real, source_length) == 0 &&
+           (parent_real[source_length] == '\0' ||
+            parent_real[source_length] == '/' || parent_real[source_length] == '\\');
+}
+
 static bool remove_tree(const char *path, char *error_path, size_t error_path_size) {
     struct stat st;
     DIR *dir;
@@ -438,6 +475,11 @@ bool fs_copy_recursive_with_options(const char *src_path, const char *dest_path,
     if (strcmp(src_path, dest_path) == 0) {
         errno = EINVAL;
         set_error_path(error_path, error_path_size, src_path);
+        return false;
+    }
+    if (destination_is_inside_source(src_path, dest_path)) {
+        errno = EINVAL;
+        set_error_path(error_path, error_path_size, dest_path);
         return false;
     }
     destination_existed = lstat(dest_path, &destination_stat) == 0;
