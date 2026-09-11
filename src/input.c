@@ -6,6 +6,114 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#ifndef _WIN32
+#include <sys/wait.h>
+#include <wordexp.h>
+#include <unistd.h>
+#else
+#include <io.h>
+#include <windows.h>
+#include <shellapi.h>
+#endif
+
+bool open_file_with_editor(const char *path) {
+    struct stat file_stat;
+    bool success = false;
+    int saved_errno = 0;
+
+    if (!path || stat(path, &file_stat) != 0) {
+        return false;
+    }
+    if (!S_ISREG(file_stat.st_mode)) {
+        errno = EISDIR;
+        return false;
+    }
+    if (access(path, R_OK) != 0) {
+        return false;
+    }
+
+    def_prog_mode();
+    endwin();
+
+#ifdef _WIN32
+    {
+        HINSTANCE result = ShellExecuteA(NULL, "open", path, NULL, NULL, SW_SHOWNORMAL);
+        success = (INT_PTR)result > 32;
+        if (!success) {
+            errno = EIO;
+        }
+    }
+#else
+    {
+        const char *editor = getenv("EDITOR");
+        wordexp_t words;
+        char **editor_argv = NULL;
+        size_t editor_argc = 0;
+        pid_t child;
+        int status;
+
+        memset(&words, 0, sizeof(words));
+        if (editor && *editor && wordexp(editor, &words, WRDE_NOCMD) == 0 &&
+            words.we_wordc > 0) {
+            editor_argc = words.we_wordc;
+            editor_argv = calloc(editor_argc + 2, sizeof(*editor_argv));
+            if (editor_argv) {
+                for (size_t i = 0; i < editor_argc; ++i) {
+                    editor_argv[i] = words.we_wordv[i];
+                }
+                editor_argv[editor_argc] = (char *)path;
+            }
+        }
+
+        child = fork();
+        if (child == 0) {
+            if (editor_argv) {
+                execvp(editor_argv[0], editor_argv);
+            }
+            {
+                char *fallback[] = { (char *)"nano", (char *)path, NULL };
+                execvp(fallback[0], fallback);
+            }
+            {
+                char *fallback[] = { (char *)"vi", (char *)path, NULL };
+                execvp(fallback[0], fallback);
+            }
+            _exit(127);
+        }
+        if (child < 0) {
+            saved_errno = errno;
+        } else {
+            do {
+                success = waitpid(child, &status, 0) >= 0;
+            } while (!success && errno == EINTR);
+            if (success) {
+                success = WIFEXITED(status) && WEXITSTATUS(status) == 0;
+                if (!success) {
+                    saved_errno = WIFEXITED(status) ? EIO : EINTR;
+                }
+            } else {
+                saved_errno = errno;
+            }
+        }
+        free(editor_argv);
+        if (editor && *editor && words.we_wordc > 0) {
+            wordfree(&words);
+        }
+    }
+#endif
+
+    reset_prog_mode();
+    keypad(stdscr, TRUE);
+    clear();
+    refresh();
+    if (!success) {
+        errno = saved_errno ? saved_errno : EIO;
+    }
+    return success;
+}
 
 static bool capture_clipboard(AppState *state, bool is_cut) {
     bool has_selected = false;
@@ -39,6 +147,7 @@ static bool capture_clipboard(AppState *state, bool is_cut) {
 void input_handle(AppState *state, int ch) {
     int max_y, max_x;
     getmaxyx(stdscr, max_y, max_x);
+    (void)max_x;
     int list_height = max_y - 1;
 
     switch (ch) {
@@ -72,6 +181,14 @@ void input_handle(AppState *state, int ch) {
                 const FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 if (entry->is_dir) {
                     state_change_dir(state, entry->name);
+                } else {
+                    char path[PATH_MAX];
+                    if (utils_join_path(path, sizeof(path), state->current_path, entry->name) &&
+                        !open_file_with_editor(path)) {
+                        char message[PATH_MAX + 64];
+                        snprintf(message, sizeof(message), "%s: %s", path, strerror(errno));
+                        ui_show_message("Open failed", message);
+                    }
                 }
             }
             break;
@@ -103,7 +220,7 @@ void input_handle(AppState *state, int ch) {
                 char buf[256];
                 if (ui_prompt("Delete item? (y/n): ", buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
                     FileEntry *entry = &state->dir_list.entries[state->selected_index];
-                    char full_path[1024];
+                    char full_path[PATH_MAX];
                     snprintf(full_path, sizeof(full_path), "%s/%s", state->current_path, entry->name);
                     fs_delete(full_path);
                     state_change_dir(state, ".");
@@ -116,7 +233,7 @@ void input_handle(AppState *state, int ch) {
                 char new_name[256];
                 if (ui_prompt("New name: ", new_name, sizeof(new_name))) {
                     FileEntry *entry = &state->dir_list.entries[state->selected_index];
-                    char old_path[1024], new_path[1024];
+                    char old_path[PATH_MAX], new_path[PATH_MAX];
                     snprintf(old_path, sizeof(old_path), "%s/%s", state->current_path, entry->name);
                     snprintf(new_path, sizeof(new_path), "%s/%s", state->current_path, new_name);
                     fs_rename(old_path, new_path);
@@ -129,7 +246,7 @@ void input_handle(AppState *state, int ch) {
             {
                 char name[256];
                 if (ui_prompt("New file name: ", name, sizeof(name))) {
-                    char full_path[1024];
+                    char full_path[PATH_MAX];
                     snprintf(full_path, sizeof(full_path), "%s/%s", state->current_path, name);
                     fs_create_file(full_path);
                     state_change_dir(state, ".");
@@ -141,7 +258,7 @@ void input_handle(AppState *state, int ch) {
             {
                 char name[256];
                 if (ui_prompt("New directory name: ", name, sizeof(name))) {
-                    char full_path[1024];
+                    char full_path[PATH_MAX];
                     snprintf(full_path, sizeof(full_path), "%s/%s", state->current_path, name);
                     fs_create_dir(full_path);
                     state_change_dir(state, ".");

@@ -5,5 +5,6 @@
 #include <ncurses.h>
 
 void input_handle(AppState *state, int ch);
+bool open_file_with_editor(const char *path);
 
 #endif // INPUT_H

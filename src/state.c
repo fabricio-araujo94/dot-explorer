@@ -192,7 +192,9 @@ void state_change_dir(AppState *state, const char *new_path) {
     if (new_path[0] == '/') {
         strncpy(target_path, new_path, sizeof(target_path) - 1);
     } else {
-        snprintf(target_path, sizeof(target_path), "%s/%s", state->current_path, new_path);
+        if (!utils_join_path(target_path, sizeof(target_path), state->current_path, new_path)) {
+            return;
+        }
     }
     target_path[sizeof(target_path) - 1] = '\0';
 
