@@ -21,12 +21,7 @@ void format_size(size_t size, char *buf, size_t buf_size) {
 }
 
 bool utils_join_path(char *buffer, size_t size, const char *base, const char *name) {
-    const char separator =
-#ifdef _WIN32
-        '\\';
-#else
-        '/';
-#endif
+        const char separator = PLATFORM_PATH_SEPARATOR;
     size_t base_length;
     size_t name_start = 0;
     int written;

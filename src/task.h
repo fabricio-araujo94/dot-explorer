@@ -4,7 +4,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <limits.h>
+#include "utils/platform.h"
 
 typedef enum {
     TASK_IDLE,

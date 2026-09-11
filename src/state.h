@@ -2,11 +2,7 @@
 #define STATE_H
 
 #include "fs.h"
-#include <limits.h>
-
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
+#include "utils/platform.h"
 
 typedef struct {
     char **paths;

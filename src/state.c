@@ -1,7 +1,6 @@
 #include "state.h"
 #include "utils.h"
 #include <errno.h>
-#include <limits.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
@@ -204,7 +203,6 @@ static bool ensure_clipboard_capacity(Clipboard *clipboard) {
 bool clipboard_add_entry(Clipboard *clipboard, const char *path) {
     char absolute_path[PATH_MAX];
     char source_dir[PATH_MAX];
-    const char *resolved;
     const char *separator;
     char *copy;
 
@@ -212,8 +210,7 @@ bool clipboard_add_entry(Clipboard *clipboard, const char *path) {
         errno = EINVAL;
         return false;
     }
-    resolved = realpath(path, absolute_path);
-    if (!resolved) {
+    if (!platform_realpath(path, absolute_path, sizeof(absolute_path))) {
         return false;
     }
     for (size_t i = 0; i < clipboard->count; ++i) {
@@ -365,11 +362,10 @@ void state_change_dir(AppState *state, const char *new_path) {
         fs_free_dir_list(&state->dir_list);
         state->dir_list = new_list;
 
-        char *resolved = realpath(target_path, NULL);
-        if (resolved) {
+        char resolved[PATH_MAX];
+        if (platform_realpath(target_path, resolved, sizeof(resolved))) {
             strncpy(state->current_path, resolved, sizeof(state->current_path) - 1);
             state->current_path[sizeof(state->current_path) - 1] = '\0';
-            free(resolved);
         } else {
             strncpy(state->current_path, target_path, sizeof(state->current_path) - 1);
             state->current_path[sizeof(state->current_path) - 1] = '\0';

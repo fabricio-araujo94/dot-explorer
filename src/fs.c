@@ -1,7 +1,7 @@
 #include "fs.h"
 #include "utils.h"
+#include "utils/platform.h"
 #include <errno.h>
-#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -222,7 +222,7 @@ static bool copy_tree(const char *src_path, const char *dest_path,
     if (S_ISDIR(source_stat.st_mode)) {
         DIR *dir;
         struct dirent *entry;
-        if (mkdir(dest_path, source_stat.st_mode & 07777) != 0 && errno != EEXIST) {
+        if (platform_mkdir(dest_path, source_stat.st_mode & 07777) != 0 && errno != EEXIST) {
             set_error_path(error_path, error_path_size, dest_path);
             return false;
         }
@@ -382,9 +382,9 @@ bool fs_create_file(const char *path) {
 
 bool fs_create_dir(const char *path) {
 #ifdef _WIN32
-    return mkdir(path) == 0;
+    return platform_mkdir(path, 0755) == 0;
 #else
-    return mkdir(path, 0755) == 0;
+    return platform_mkdir(path, 0755) == 0;
 #endif
 }
 
