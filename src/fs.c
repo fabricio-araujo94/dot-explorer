@@ -326,14 +326,18 @@ bool fs_read_dir(const char *path, DirectoryList *list) {
         }
 
         struct stat st;
-        if (stat(full_path, &st) == 0) {
+        if (lstat(full_path, &st) == 0) {
             entry->is_dir = S_ISDIR(st.st_mode);
             entry->size = st.st_size;
             entry->mtime = st.st_mtime;
+            entry->mode = st.st_mode;
+            entry->is_symlink = S_ISLNK(st.st_mode);
         } else {
             entry->is_dir = (dp->d_type == DT_DIR);
             entry->size = 0;
             entry->mtime = 0;
+            entry->mode = 0;
+            entry->is_symlink = false;
         }
 
         list->count++;

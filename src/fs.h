@@ -11,6 +11,8 @@ typedef struct {
     bool is_dir;
     off_t size;
     time_t mtime;
+    mode_t mode;
+    bool is_symlink;
     bool is_selected;
 } FileEntry;
 

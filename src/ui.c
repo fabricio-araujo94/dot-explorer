@@ -2,6 +2,7 @@
 #include "input.h"
 #include "config.h"
 #include "utils.h"
+#include "utils/theme.h"
 #include <limits.h>
 #include <string.h>
 #include <stdio.h>
@@ -20,6 +21,11 @@ void ui_init(void) {
         init_pair(2, COLOR_WHITE, -1);
         init_pair(3, COLOR_BLACK, COLOR_CYAN);
         init_pair(4, COLOR_WHITE, COLOR_BLUE);
+        init_pair(5, COLOR_BLUE, -1);
+        init_pair(6, COLOR_GREEN, -1);
+        init_pair(7, COLOR_MAGENTA, -1);
+        init_pair(8, COLOR_RED, -1);
+        init_pair(9, COLOR_CYAN, -1);
     }
 }
 
@@ -156,6 +162,11 @@ static void pane_sync(Pane *pane) {
     pane->selected_index = pane->state.selected_index;
 }
 
+static const char *file_extension(const char *name) {
+    const char *dot = strrchr(name, '.');
+    return dot ? dot : "";
+}
+
 static void draw_pane(const Pane *pane, bool active) {
     int list_height = pane->height - 2;
     int visible_count = state_visible_count(&pane->state);
@@ -180,12 +191,15 @@ static void draw_pane(const Pane *pane, bool active) {
         const FileEntry *entry = &pane->state.dir_list.entries[original_index];
         int screen_y = pane->y + row + 1;
         bool cursor = original_index == pane->state.selected_index;
+        FileTheme theme = get_file_color_and_icon(entry->mode,
+                              file_extension(entry->name));
         attr_t attributes = cursor ? (COLOR_PAIR(3) | A_BOLD) :
-                            (entry->is_dir ? (COLOR_PAIR(1) | A_BOLD) : COLOR_PAIR(2));
+                    (COLOR_PAIR(theme.color_pair) |
+                     (entry->is_dir || theme.color_pair == 6 ? A_BOLD : 0));
         char line[PATH_MAX];
 
-        snprintf(line, sizeof(line), "%c%c %s", entry->is_selected ? '*' : ' ',
-                 entry->is_dir ? '/' : ' ', entry->name);
+        snprintf(line, sizeof(line), "%c%s %s", entry->is_selected ? '*' : ' ',
+             theme.icon, entry->name);
         attron(attributes);
         mvhline(screen_y, pane->x + 1, ' ', content_width);
         mvaddnstr(screen_y, pane->x + 1, line, content_width);
