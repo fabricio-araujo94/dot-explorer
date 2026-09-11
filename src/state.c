@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 void state_init(AppState *state) {
     if (getcwd(state->current_path, sizeof(state->current_path)) == NULL) {
