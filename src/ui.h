@@ -7,6 +7,7 @@
 void ui_init(void);
 void ui_cleanup(void);
 void ui_render(const AppState *state);
+void ui_render_filter_prompt(const char *query);
 bool ui_prompt(const char *prompt, char *buffer, size_t buf_size);
 void ui_show_message(const char *title, const char *message);
 

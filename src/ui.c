@@ -1,6 +1,8 @@
 #include "ui.h"
 #include "config.h"
+#include <limits.h>
 #include <string.h>
+#include <stdio.h>
 
 void ui_init(void) {
     initscr();
@@ -27,9 +29,8 @@ static void render_status_bar(const AppState *state, int max_y, int max_x) {
     attron(COLOR_PAIR(4));
     mvhline(max_y - 1, 0, ' ', max_x);
     
-    char status[1024];
-    snprintf(status, sizeof(status), " %s | %d items ", state->current_path, state->dir_list.count);
-    mvprintw(max_y - 1, 0, "%s", status);
+    mvprintw(max_y - 1, 0, " %.*s | %d items ", max_x - 1,
+             state->current_path, state_visible_count(state));
     
     char right_status[128];
     snprintf(right_status, sizeof(right_status), " %s v%s ", APP_NAME, APP_VERSION);
@@ -48,8 +49,9 @@ void ui_render(const AppState *state) {
 
     int list_height = max_y - 1;
     
-    for (int i = 0; i < list_height && (i + state->scroll_offset) < state->dir_list.count; ++i) {
-        int idx = i + state->scroll_offset;
+    for (int i = 0; i < list_height && (i + state->scroll_offset) < state_visible_count(state); ++i) {
+        int view_index = i + state->scroll_offset;
+        int idx = state_visible_index(state, view_index);
         const FileEntry *entry = &state->dir_list.entries[idx];
 
         bool is_selected = (idx == state->selected_index);
@@ -82,6 +84,17 @@ void ui_render(const AppState *state) {
 
     render_status_bar(state, max_y, max_x);
 
+    refresh();
+}
+
+void ui_render_filter_prompt(const char *query) {
+    int max_y, max_x;
+    getmaxyx(stdscr, max_y, max_x);
+    mvhline(max_y - 2, 0, ' ', max_x);
+    attron(COLOR_PAIR(4));
+    mvprintw(max_y - 2, 0, "Filter: [%s]_", query);
+    attroff(COLOR_PAIR(4));
+    move(max_y - 2, 9 + (int)strlen(query));
     refresh();
 }
 

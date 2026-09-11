@@ -6,6 +6,63 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
+
+void entry_list_clear(EntryList *list) {
+    if (!list) return;
+    free(list->indices);
+    list->indices = NULL;
+    list->count = 0;
+    list->capacity = 0;
+}
+
+static bool fuzzy_match(const char *name, const char *query) {
+    while (*name && *query) {
+        if (tolower((unsigned char)*name) == tolower((unsigned char)*query)) {
+            query++;
+        }
+        name++;
+    }
+    return *query == '\0';
+}
+
+bool filter_entries(const char *query, const DirectoryList *source, EntryList *list) {
+    if (!query || !source || !list) {
+        errno = EINVAL;
+        return false;
+    }
+    list->count = 0;
+    for (int i = 0; i < source->count; ++i) {
+        if (fuzzy_match(source->entries[i].name, query)) {
+            if (list->count == list->capacity) {
+                int new_capacity = list->capacity == 0 ? 32 : list->capacity * 2;
+                int *new_indices = realloc(list->indices,
+                                            (size_t)new_capacity * sizeof(*new_indices));
+                if (!new_indices) {
+                    errno = ENOMEM;
+                    list->count = 0;
+                    return false;
+                }
+                list->indices = new_indices;
+                list->capacity = new_capacity;
+            }
+            list->indices[list->count++] = i;
+        }
+    }
+    return true;
+}
+
+int state_visible_count(const AppState *state) {
+    return state->filter_active ? state->filtered_entries.count : state->dir_list.count;
+}
+
+int state_visible_index(const AppState *state, int view_index) {
+    if (state->filter_active) {
+        if (view_index < 0 || view_index >= state->filtered_entries.count) return -1;
+        return state->filtered_entries.indices[view_index];
+    }
+    return view_index >= 0 && view_index < state->dir_list.count ? view_index : -1;
+}
 
 static bool set_error_path(char *error_path, size_t error_path_size, const char *path) {
     int written;
@@ -176,6 +233,9 @@ void state_init(AppState *state) {
     state->scroll_offset = 0;
     state->should_quit = false;
     state->sort_type = SORT_NAME;
+    memset(&state->filtered_entries, 0, sizeof(state->filtered_entries));
+    state->filter_active = false;
+    state->filter_query[0] = '\0';
     memset(&state->clipboard, 0, sizeof(state->clipboard));
 
     fs_read_dir(state->current_path, &state->dir_list);
@@ -183,6 +243,7 @@ void state_init(AppState *state) {
 }
 
 void state_cleanup(AppState *state) {
+    entry_list_clear(&state->filtered_entries);
     clipboard_clear(&state->clipboard);
     fs_free_dir_list(&state->dir_list);
 }
@@ -217,6 +278,9 @@ void state_change_dir(AppState *state, const char *new_path) {
 
         state->selected_index = 0;
         state->scroll_offset = 0;
+        state->filter_active = false;
+        state->filter_query[0] = '\0';
+        entry_list_clear(&state->filtered_entries);
     } else {
         fs_free_dir_list(&new_list);
     }

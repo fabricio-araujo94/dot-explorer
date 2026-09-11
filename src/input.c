@@ -6,6 +6,72 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <ctype.h>
+
+static int current_view_index(const AppState *state) {
+    if (!state->filter_active) return state->selected_index;
+    for (int i = 0; i < state->filtered_entries.count; ++i) {
+        if (state->filtered_entries.indices[i] == state->selected_index) return i;
+    }
+    return -1;
+}
+
+static void move_visible_selection(AppState *state, int view_index, int list_height) {
+    int visible_count = state_visible_count(state);
+    int original_index;
+    if (visible_count == 0) {
+        state->selected_index = 0;
+        state->scroll_offset = 0;
+        return;
+    }
+    if (view_index < 0) view_index = 0;
+    if (view_index >= visible_count) view_index = visible_count - 1;
+    original_index = state_visible_index(state, view_index);
+    if (original_index >= 0) state->selected_index = original_index;
+    if (view_index < state->scroll_offset) state->scroll_offset = view_index;
+    if (view_index >= state->scroll_offset + list_height) {
+        state->scroll_offset = view_index - list_height + 1;
+    }
+}
+
+static void filter_prompt(AppState *state) {
+    int length = 0;
+    state->filter_active = true;
+    state->filter_query[0] = '\0';
+    filter_entries(state->filter_query, &state->dir_list, &state->filtered_entries);
+    curs_set(1);
+    for (;;) {
+        int ch;
+        ui_render_filter_prompt(state->filter_query);
+        ch = getch();
+        if (ch == 27) {
+            state->filter_active = false;
+            state->filter_query[0] = '\0';
+            entry_list_clear(&state->filtered_entries);
+            break;
+        }
+        if (ch == '\n' || ch == KEY_ENTER) break;
+        if (ch == KEY_BACKSPACE || ch == 127 || ch == '\b') {
+            if (length > 0) state->filter_query[--length] = '\0';
+        } else if (isprint((unsigned char)ch) &&
+                   length < (int)sizeof(state->filter_query) - 1) {
+            state->filter_query[length++] = (char)ch;
+            state->filter_query[length] = '\0';
+        } else {
+            continue;
+        }
+        filter_entries(state->filter_query, &state->dir_list, &state->filtered_entries);
+        if (state->filtered_entries.count > 0 && current_view_index(state) < 0) {
+            state->selected_index = state->filtered_entries.indices[0];
+            state->scroll_offset = 0;
+        }
+    }
+    if (state->filter_query[0] == '\0') {
+        state->filter_active = false;
+        entry_list_clear(&state->filtered_entries);
+    }
+    curs_set(0);
+}
 #include <errno.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -157,22 +223,16 @@ void input_handle(AppState *state, int ch) {
             
         case KEY_UP_DIR:
         case KEY_UP:
-            if (state->selected_index > 0) {
-                state->selected_index--;
-                if (state->selected_index < state->scroll_offset) {
-                    state->scroll_offset = state->selected_index;
-                }
-            }
+            move_visible_selection(state, current_view_index(state) - 1, list_height);
             break;
 
         case KEY_DOWN_DIR:
         case KEY_DOWN:
-            if (state->selected_index < state->dir_list.count - 1) {
-                state->selected_index++;
-                if (state->selected_index >= state->scroll_offset + list_height) {
-                    state->scroll_offset = state->selected_index - list_height + 1;
-                }
-            }
+            move_visible_selection(state, current_view_index(state) + 1, list_height);
+            break;
+
+        case '/':
+            filter_prompt(state);
             break;
 
         case KEY_ENTER_DIR:
@@ -221,7 +281,7 @@ void input_handle(AppState *state, int ch) {
                 if (ui_prompt("Delete item? (y/n): ", buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
                     FileEntry *entry = &state->dir_list.entries[state->selected_index];
                     char full_path[PATH_MAX];
-                    snprintf(full_path, sizeof(full_path), "%s/%s", state->current_path, entry->name);
+                    utils_join_path(full_path, sizeof(full_path), state->current_path, entry->name);
                     fs_delete(full_path);
                     state_change_dir(state, ".");
                 }
@@ -234,8 +294,8 @@ void input_handle(AppState *state, int ch) {
                 if (ui_prompt("New name: ", new_name, sizeof(new_name))) {
                     FileEntry *entry = &state->dir_list.entries[state->selected_index];
                     char old_path[PATH_MAX], new_path[PATH_MAX];
-                    snprintf(old_path, sizeof(old_path), "%s/%s", state->current_path, entry->name);
-                    snprintf(new_path, sizeof(new_path), "%s/%s", state->current_path, new_name);
+                    utils_join_path(old_path, sizeof(old_path), state->current_path, entry->name);
+                    utils_join_path(new_path, sizeof(new_path), state->current_path, new_name);
                     fs_rename(old_path, new_path);
                     state_change_dir(state, ".");
                 }
@@ -247,7 +307,7 @@ void input_handle(AppState *state, int ch) {
                 char name[256];
                 if (ui_prompt("New file name: ", name, sizeof(name))) {
                     char full_path[PATH_MAX];
-                    snprintf(full_path, sizeof(full_path), "%s/%s", state->current_path, name);
+                    utils_join_path(full_path, sizeof(full_path), state->current_path, name);
                     fs_create_file(full_path);
                     state_change_dir(state, ".");
                 }
@@ -259,7 +319,7 @@ void input_handle(AppState *state, int ch) {
                 char name[256];
                 if (ui_prompt("New directory name: ", name, sizeof(name))) {
                     char full_path[PATH_MAX];
-                    snprintf(full_path, sizeof(full_path), "%s/%s", state->current_path, name);
+                    utils_join_path(full_path, sizeof(full_path), state->current_path, name);
                     fs_create_dir(full_path);
                     state_change_dir(state, ".");
                 }

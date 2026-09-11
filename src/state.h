@@ -17,12 +17,21 @@ typedef struct {
 } Clipboard;
 
 typedef struct {
+    int *indices;
+    int count;
+    int capacity;
+} EntryList;
+
+typedef struct {
     char current_path[PATH_MAX];
     DirectoryList dir_list;
     int selected_index;
     int scroll_offset;
     bool should_quit;
     SortType sort_type;
+    EntryList filtered_entries;
+    bool filter_active;
+    char filter_query[256];
 
     Clipboard clipboard;
 } AppState;
@@ -30,6 +39,10 @@ typedef struct {
 void state_init(AppState *state);
 void state_cleanup(AppState *state);
 void state_change_dir(AppState *state, const char *new_path);
+void entry_list_clear(EntryList *list);
+bool filter_entries(const char *query, const DirectoryList *source, EntryList *list);
+int state_visible_count(const AppState *state);
+int state_visible_index(const AppState *state, int view_index);
 bool clipboard_add_entry(Clipboard *clipboard, const char *path);
 void clipboard_clear(Clipboard *clipboard);
 void clipboard_invert_selection(DirectoryList *list);
