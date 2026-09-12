@@ -327,7 +327,6 @@ void state_init(AppState *state) {
     memset(&state->filtered_entries, 0, sizeof(state->filtered_entries));
     state->filter_active = false;
     state->filter_query[0] = '\0';
-    memset(&state->clipboard, 0, sizeof(state->clipboard));
     memset(&state->history, 0, sizeof(state->history));
 
     fs_read_dir(state->current_path, &state->dir_list);
@@ -336,7 +335,6 @@ void state_init(AppState *state) {
 
 void state_cleanup(AppState *state) {
     entry_list_clear(&state->filtered_entries);
-    clipboard_clear(&state->clipboard);
     history_clear_stack(&state->history.back, &state->history.back_count,
                         &state->history.back_capacity);
     history_clear_stack(&state->history.forward, &state->history.forward_count,

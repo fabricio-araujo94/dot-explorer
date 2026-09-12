@@ -1,4 +1,5 @@
 #include "fs.h"
+#include "state.h"
 #include "utils.h"
 #include <assert.h>
 #include <errno.h>
@@ -96,6 +97,35 @@ static void test_copy_into_itself(void) {
     teardown();
 }
 
+static void test_clipboard_apply_between_directories(void) {
+    Clipboard clipboard = { 0 };
+    char source_dir[PATH_MAX];
+    char destination_dir[PATH_MAX];
+    char source_file[PATH_MAX];
+    char copied_file[PATH_MAX];
+    char error_path[PATH_MAX];
+    FILE *file;
+
+    setup();
+    make_path(source_dir, sizeof(source_dir), "source");
+    make_path(destination_dir, sizeof(destination_dir), "destination");
+    assert(mkdir(source_dir, 0700) == 0);
+    assert(mkdir(destination_dir, 0700) == 0);
+    assert(utils_join_path(source_file, sizeof(source_file), source_dir, "item.txt"));
+    write_file(source_file, "clipboard");
+    assert(clipboard_add_entry(&clipboard, source_file));
+    assert(!clipboard.is_cut);
+    assert(clipboard_apply_operation(&clipboard, destination_dir,
+                                     error_path, sizeof(error_path)));
+    assert(utils_join_path(copied_file, sizeof(copied_file), destination_dir, "item.txt"));
+    file = fopen(copied_file, "rb");
+    assert(file != NULL);
+    fclose(file);
+    assert(access(source_file, F_OK) == 0);
+    clipboard_clear(&clipboard);
+    teardown();
+}
+
 static void test_permission_denied(void) {
 #ifdef _WIN32
     return;
@@ -138,6 +168,7 @@ int main(void) {
     test_delete_circular_symlinks();
     test_delete_parent_path_is_blocked();
     test_copy_into_itself();
+    test_clipboard_apply_between_directories();
     test_permission_denied();
     test_path_near_path_max();
     puts("test_fs: all tests passed");

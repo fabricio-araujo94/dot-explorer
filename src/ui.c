@@ -225,11 +225,15 @@ void ui_dual_init(DualPaneUI *ui) {
     pane_sync(&ui->panes[0]);
     pane_sync(&ui->panes[1]);
     ui->active_pane_index = 0;
+    memset(&ui->clipboard, 0, sizeof(ui->clipboard));
+    ui->task_destination_pane = -1;
+    ui->task_refresh_pending = false;
     task_init(&ui->task);
 }
 
 void ui_dual_cleanup(DualPaneUI *ui) {
     task_cleanup(&ui->task);
+    clipboard_clear(&ui->clipboard);
     state_cleanup(&ui->panes[0].state);
     state_cleanup(&ui->panes[1].state);
 }
@@ -273,6 +277,12 @@ void ui_draw(DualPaneUI *ui) {
         } else if (status == TASK_CANCELLED) {
             mvprintw(max_y - 1, 1, "Copy cancelled");
         }
+        if (status == TASK_COMPLETED && ui->task_refresh_pending) {
+            Pane *destination = &ui->panes[ui->task_destination_pane];
+            state_change_dir(&destination->state, ".");
+            pane_sync(destination);
+            ui->task_refresh_pending = false;
+        }
         if (status != TASK_RUNNING && status != TASK_IDLE && ui->task.thread_started) {
             task_reap(&ui->task);
         }
@@ -282,7 +292,6 @@ void ui_draw(DualPaneUI *ui) {
 
 void ui_handle_input(DualPaneUI *ui, int ch) {
     Pane *active = &ui->panes[ui->active_pane_index];
-    Pane *other = &ui->panes[1 - ui->active_pane_index];
 
     if (task_is_running(&ui->task)) {
         if (ch == 27) task_request_cancel(&ui->task);
@@ -293,29 +302,33 @@ void ui_handle_input(DualPaneUI *ui, int ch) {
         ui->active_pane_index = 1 - ui->active_pane_index;
         return;
     }
-    if (ch == KEY_PASTE && active->state.clipboard.count > 0) {
-        if (!active->state.clipboard.is_cut && active->state.clipboard.count == 1) {
+    if (ch == KEY_PASTE && ui->clipboard.count > 0) {
+        if (!ui->clipboard.is_cut && ui->clipboard.count == 1) {
             char destination[PATH_MAX];
-            const char *source = active->state.clipboard.paths[0];
+            const char *source = ui->clipboard.paths[0];
             const char *name = strrchr(source, '/');
             name = name ? name + 1 : source;
             if (utils_join_path(destination, sizeof(destination),
-                                other->state.current_path, name) &&
+                                active->state.current_path, name) &&
                 task_start_copy(&ui->task, source, destination)) {
+                ui->task_destination_pane = ui->active_pane_index;
+                ui->task_refresh_pending = true;
                 return;
             }
         }
         char error_path[PATH_MAX];
-        if (!clipboard_apply_operation(&active->state.clipboard,
-                                       other->state.current_path,
+        if (!clipboard_apply_operation(&ui->clipboard,
+                                       active->state.current_path,
                                        error_path, sizeof(error_path))) {
             ui_show_message("Paste failed", error_path);
         }
-        state_change_dir(&other->state, ".");
-        pane_sync(other);
+        state_change_dir(&active->state, ".");
+        pane_sync(active);
         return;
     }
-    input_handle(&active->state, ch);
+    if (ch != KEY_PASTE) {
+        input_handle(&active->state, &ui->clipboard, ch);
+    }
     pane_sync(active);
 }
 

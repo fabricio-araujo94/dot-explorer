@@ -19,6 +19,9 @@ typedef struct {
 	Pane panes[2];
 	int active_pane_index;
 	Task task;
+	Clipboard clipboard;
+	int task_destination_pane;
+	bool task_refresh_pending;
 } DualPaneUI;
 
 void ui_init(void);

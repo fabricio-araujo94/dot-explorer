@@ -43,7 +43,6 @@ typedef struct {
     bool filter_active;
     char filter_query[256];
 
-    Clipboard clipboard;
     NavigationHistory history;
 } AppState;
 

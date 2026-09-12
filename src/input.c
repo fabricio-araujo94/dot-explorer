@@ -213,10 +213,11 @@ bool open_file_with_editor(const char *path) {
     return success;
 }
 
-static bool capture_clipboard(AppState *state, bool is_cut) {
+static bool capture_clipboard(AppState *state, Clipboard *clipboard, bool is_cut) {
     bool has_selected = false;
 
-    clipboard_clear(&state->clipboard);
+    if (!clipboard) return false;
+    clipboard_clear(clipboard);
     for (int i = 0; i < state->dir_list.count; ++i) {
         if (state->dir_list.entries[i].is_selected) {
             has_selected = true;
@@ -236,16 +237,16 @@ static bool capture_clipboard(AppState *state, bool is_cut) {
         }
         if (!utils_join_path(path, sizeof(path), state->current_path,
                              state->dir_list.entries[i].name) ||
-            !clipboard_add_entry(&state->clipboard, path)) {
-            clipboard_clear(&state->clipboard);
+            !clipboard_add_entry(clipboard, path)) {
+            clipboard_clear(clipboard);
             return false;
         }
     }
-    state->clipboard.is_cut = is_cut;
-    return state->clipboard.count > 0;
+    clipboard->is_cut = is_cut;
+    return clipboard->count > 0;
 }
 
-void input_handle(AppState *state, int ch) {
+void input_handle(AppState *state, Clipboard *clipboard, int ch) {
     int max_y, max_x;
     getmaxyx(stdscr, max_y, max_x);
     (void)max_x;
@@ -418,7 +419,7 @@ void input_handle(AppState *state, int ch) {
 
         case KEY_COPY:
             if (state->dir_list.count > 0) {
-                if (!capture_clipboard(state, false) &&
+                if (!capture_clipboard(state, clipboard, false) &&
                     is_navigation_entry(&state->dir_list.entries[state->selected_index])) {
                     ui_show_message("Copy blocked", "Navigation entries cannot be copied.");
                 }
@@ -427,7 +428,7 @@ void input_handle(AppState *state, int ch) {
 
         case KEY_CUT:
             if (state->dir_list.count > 0) {
-                if (!capture_clipboard(state, true) &&
+                if (!capture_clipboard(state, clipboard, true) &&
                     is_navigation_entry(&state->dir_list.entries[state->selected_index])) {
                     ui_show_message("Cut blocked", "Navigation entries cannot be cut.");
                 }
@@ -435,9 +436,9 @@ void input_handle(AppState *state, int ch) {
             break;
 
         case KEY_PASTE:
-            if (state->clipboard.count > 0) {
+            if (clipboard && clipboard->count > 0) {
                 char error_path[PATH_MAX];
-                if (!clipboard_apply_operation(&state->clipboard, state->current_path,
+                if (!clipboard_apply_operation(clipboard, state->current_path,
                                                error_path, sizeof(error_path))) {
                     ui_show_message("Paste failed", error_path);
                 }
