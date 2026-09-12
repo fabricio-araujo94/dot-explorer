@@ -85,19 +85,50 @@ void task_cleanup(Task *task) {
 }
 
 void task_reap(Task *task) {
-    if (!task || !task->thread_started) return;
-    pthread_join(task->thread, NULL);
-    task->thread_started = false;
+    pthread_t thread;
+
+    if (!task) return;
+    pthread_mutex_lock(&task->mutex);
+    if (!task->thread_started) {
+        pthread_mutex_unlock(&task->mutex);
+        return;
+    }
+    thread = task->thread;
+    pthread_mutex_unlock(&task->mutex);
+
+    pthread_join(thread, NULL);
+
+    pthread_mutex_lock(&task->mutex);
+    if (task->thread_started && pthread_equal(task->thread, thread)) {
+        task->thread_started = false;
+    }
+    pthread_mutex_unlock(&task->mutex);
 }
 
 bool task_start_copy(Task *task, const char *source, const char *destination) {
     struct stat st;
-    if (!task || !source || !destination || task_is_running(task) ||
+    bool previous_thread;
+
+    if (!task || !source || !destination ||
         strlen(source) >= sizeof(task->source) || strlen(destination) >= sizeof(task->destination) ||
         stat(source, &st) != 0) {
         errno = EINVAL;
         return false;
     }
+
+    pthread_mutex_lock(&task->mutex);
+    previous_thread = task->thread_started;
+    bool running = task->status == TASK_RUNNING;
+    pthread_mutex_unlock(&task->mutex);
+    if (running) {
+        errno = EBUSY;
+        return false;
+    }
+    if (previous_thread) {
+        task_reap(task);
+    }
+
+    pthread_mutex_lock(&task->mutex);
     snprintf(task->source, sizeof(task->source), "%s", source);
     snprintf(task->destination, sizeof(task->destination), "%s", destination);
     task->total_bytes = tree_size(source);
@@ -106,11 +137,16 @@ bool task_start_copy(Task *task, const char *source, const char *destination) {
     task->error_path[0] = '\0';
     task->cancel_requested = false;
     task->status = TASK_RUNNING;
+    pthread_mutex_unlock(&task->mutex);
     if (pthread_create(&task->thread, NULL, copy_worker, task) != 0) {
+        pthread_mutex_lock(&task->mutex);
         task->status = TASK_FAILED;
+        pthread_mutex_unlock(&task->mutex);
         return false;
     }
+    pthread_mutex_lock(&task->mutex);
     task->thread_started = true;
+    pthread_mutex_unlock(&task->mutex);
     return true;
 }
 
@@ -134,7 +170,7 @@ void task_snapshot(Task *task, TaskStatus *status, uint64_t *bytes_copied,
                    uint64_t *total_bytes, char *error_path, size_t error_size) {
     pthread_mutex_lock(&task->mutex);
     if (status) *status = task->status;
-    if (bytes_copied) *bytes_copied = task->bytes_copied;
+    if (bytes_copied) *bytes_copied = task->bytes_copied + task->current_file_bytes;
     if (total_bytes) *total_bytes = task->total_bytes;
     if (error_path && error_size > 0) snprintf(error_path, error_size, "%s", task->error_path);
     pthread_mutex_unlock(&task->mutex);

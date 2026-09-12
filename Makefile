@@ -15,8 +15,8 @@ all: $(TARGET)
 test: $(TEST_TARGET)
 	./$(TEST_TARGET)
 
-$(TEST_TARGET): tests/test_fs.c src/fs.c src/state.c src/utils.c
-	$(CC) $(CFLAGS) tests/test_fs.c src/fs.c src/state.c src/utils.c -o $@
+$(TEST_TARGET): tests/test_fs.c src/fs.c src/state.c src/task.c src/utils.c
+	$(CC) $(CFLAGS) tests/test_fs.c src/fs.c src/state.c src/task.c src/utils.c -pthread -o $@
 
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS)

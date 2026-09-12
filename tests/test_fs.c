@@ -1,5 +1,6 @@
 #include "fs.h"
 #include "state.h"
+#include "task.h"
 #include "utils.h"
 #include <assert.h>
 #include <errno.h>
@@ -190,6 +191,35 @@ static void test_path_near_path_max(void) {
     teardown();
 }
 
+static void test_async_task_lifecycle(void) {
+    Task task;
+    char source[PATH_MAX];
+    char destination[PATH_MAX];
+    TaskStatus status = TASK_IDLE;
+    uint64_t copied = 0;
+    uint64_t total = 0;
+    char error_path[PATH_MAX];
+    int attempts = 0;
+
+    setup();
+    make_path(source, sizeof(source), "async-source.txt");
+    make_path(destination, sizeof(destination), "async-copy.txt");
+    write_file(source, "background copy");
+    task_init(&task);
+    assert(task_start_copy(&task, source, destination));
+    do {
+        task_snapshot(&task, &status, &copied, &total,
+                      error_path, sizeof(error_path));
+        if (status == TASK_RUNNING) usleep(1000);
+    } while (status == TASK_RUNNING && ++attempts < 10000);
+    assert(status == TASK_COMPLETED);
+    assert(total > 0);
+    assert(copied == total);
+    assert(access(destination, F_OK) == 0);
+    task_cleanup(&task);
+    teardown();
+}
+
 int main(void) {
     test_delete_circular_symlinks();
     test_delete_parent_path_is_blocked();
@@ -197,6 +227,7 @@ int main(void) {
     test_clipboard_apply_between_directories();
     test_clipboard_cut_same_filesystem();
     test_permission_denied();
+    test_async_task_lifecycle();
     test_path_near_path_max();
     puts("test_fs: all tests passed");
     return 0;

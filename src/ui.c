@@ -304,7 +304,7 @@ void ui_draw(DualPaneUI *ui) {
             pane_sync(destination);
             ui->task_refresh_pending = false;
         }
-        if (status != TASK_RUNNING && status != TASK_IDLE && ui->task.thread_started) {
+        if (status != TASK_RUNNING && status != TASK_IDLE) {
             task_reap(&ui->task);
         }
     }
