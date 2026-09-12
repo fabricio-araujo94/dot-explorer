@@ -52,6 +52,32 @@ static void test_delete_circular_symlinks(void) {
     teardown();
 }
 
+static void test_delete_parent_path_is_blocked(void) {
+    char parent[PATH_MAX];
+    char child[PATH_MAX];
+    char sentinel[PATH_MAX];
+    char parent_dotdot[PATH_MAX];
+
+    setup();
+    make_path(parent, sizeof(parent), "parent");
+    assert(mkdir(parent, 0700) == 0);
+    make_path(child, sizeof(child), "parent/child");
+    assert(mkdir(child, 0700) == 0);
+    make_path(sentinel, sizeof(sentinel), "parent/important.txt");
+    write_file(sentinel, "keep");
+    assert(utils_join_path(parent_dotdot, sizeof(parent_dotdot), parent, ".."));
+
+    errno = 0;
+    assert(!fs_delete_recursive(parent_dotdot));
+    assert(errno == EINVAL);
+    errno = 0;
+    assert(!fs_delete(parent_dotdot));
+    assert(errno == EINVAL);
+    assert(access(parent, F_OK) == 0);
+    assert(access(sentinel, F_OK) == 0);
+    teardown();
+}
+
 static void test_copy_into_itself(void) {
     char source[PATH_MAX];
     char nested[PATH_MAX];
@@ -110,6 +136,7 @@ static void test_path_near_path_max(void) {
 
 int main(void) {
     test_delete_circular_symlinks();
+    test_delete_parent_path_is_blocked();
     test_copy_into_itself();
     test_permission_denied();
     test_path_near_path_max();

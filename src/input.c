@@ -10,6 +10,11 @@
 
 static int escape_sequence_state;
 
+static bool is_navigation_entry(const FileEntry *entry) {
+    return entry && (strcmp(entry->name, ".") == 0 ||
+                     strcmp(entry->name, "..") == 0);
+}
+
 static void navigate_history(AppState *state, bool forward) {
     char path[PATH_MAX];
     int selected_index;
@@ -226,6 +231,9 @@ static bool capture_clipboard(AppState *state, bool is_cut) {
         if (!has_selected && i != state->selected_index) {
             continue;
         }
+        if (is_navigation_entry(&state->dir_list.entries[i])) {
+            continue;
+        }
         if (!utils_join_path(path, sizeof(path), state->current_path,
                              state->dir_list.entries[i].name) ||
             !clipboard_add_entry(&state->clipboard, path)) {
@@ -336,9 +344,13 @@ void input_handle(AppState *state, int ch) {
 
         case KEY_DELETE_ITEM:
             if (state->dir_list.count > 0) {
+                FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 char buf[256];
+                if (is_navigation_entry(entry)) {
+                    ui_show_message("Delete blocked", "Navigation entries cannot be deleted.");
+                    break;
+                }
                 if (ui_prompt("Delete item? (y/n): ", buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
-                    FileEntry *entry = &state->dir_list.entries[state->selected_index];
                     char full_path[PATH_MAX];
                     utils_join_path(full_path, sizeof(full_path), state->current_path, entry->name);
                     fs_delete(full_path);
@@ -349,9 +361,13 @@ void input_handle(AppState *state, int ch) {
 
         case KEY_RENAME_ITEM:
             if (state->dir_list.count > 0) {
+                FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 char new_name[256];
+                if (is_navigation_entry(entry)) {
+                    ui_show_message("Rename blocked", "Navigation entries cannot be renamed.");
+                    break;
+                }
                 if (ui_prompt("New name: ", new_name, sizeof(new_name))) {
-                    FileEntry *entry = &state->dir_list.entries[state->selected_index];
                     char old_path[PATH_MAX], new_path[PATH_MAX];
                     utils_join_path(old_path, sizeof(old_path), state->current_path, entry->name);
                     utils_join_path(new_path, sizeof(new_path), state->current_path, new_name);
@@ -402,13 +418,19 @@ void input_handle(AppState *state, int ch) {
 
         case KEY_COPY:
             if (state->dir_list.count > 0) {
-                capture_clipboard(state, false);
+                if (!capture_clipboard(state, false) &&
+                    is_navigation_entry(&state->dir_list.entries[state->selected_index])) {
+                    ui_show_message("Copy blocked", "Navigation entries cannot be copied.");
+                }
             }
             break;
 
         case KEY_CUT:
             if (state->dir_list.count > 0) {
-                capture_clipboard(state, true);
+                if (!capture_clipboard(state, true) &&
+                    is_navigation_entry(&state->dir_list.entries[state->selected_index])) {
+                    ui_show_message("Cut blocked", "Navigation entries cannot be cut.");
+                }
             }
             break;
 

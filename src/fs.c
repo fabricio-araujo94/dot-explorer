@@ -15,6 +15,25 @@
 
 #define FS_MAX_COPY_DEPTH 128
 
+static bool is_protected_delete_path(const char *path) {
+    size_t length;
+    const char *name;
+
+    if (!path || !*path) return true;
+    length = strlen(path);
+    while (length > 1 && (path[length - 1] == '/' || path[length - 1] == '\\')) {
+        length--;
+    }
+    if (length == 1 && (path[0] == '/' || path[0] == '\\')) return true;
+#ifdef _WIN32
+    if (length == 3 && path[1] == ':' &&
+        (path[2] == '/' || path[2] == '\\')) return true;
+#endif
+    name = path + length;
+    while (name > path && name[-1] != '/' && name[-1] != '\\') name--;
+    return strcmp(name, ".") == 0 || strcmp(name, "..") == 0;
+}
+
 static bool set_error_path(char *error_path, size_t error_path_size, const char *path) {
     int written;
     if (!error_path || error_path_size == 0) {
@@ -100,6 +119,11 @@ static bool remove_tree(const char *path, char *error_path, size_t error_path_si
     DIR *dir;
     struct dirent *entry;
 
+    if (is_protected_delete_path(path)) {
+        errno = EINVAL;
+        set_error_path(error_path, error_path_size, path);
+        return false;
+    }
     if (lstat(path, &st) != 0) {
         set_error_path(error_path, error_path_size, path);
         return false;
@@ -431,7 +455,7 @@ bool fs_delete(const char *path) {
 
 bool fs_delete_recursive(const char *path) {
     char error_path[PATH_MAX];
-    if (!path || !*path) {
+    if (is_protected_delete_path(path)) {
         errno = EINVAL;
         return false;
     }
