@@ -136,29 +136,50 @@ bool ui_prompt(const char *prompt, char *buffer, size_t buf_size) {
 
 void ui_show_message(const char *title, const char *message) {
     int max_y, max_x;
+    const char *safe_title = title ? title : "Message";
+    const char *safe_message = message ? message : "";
     getmaxyx(stdscr, max_y, max_x);
-    
-    int box_h = 10;
-    int box_w = max_x / 2;
+
+    if (max_y < 3 || max_x < 8) {
+        if (max_y > 0 && max_x > 0) {
+            mvaddnstr(max_y - 1, 0, safe_message, max_x);
+            refresh();
+            getch();
+        }
+        return;
+    }
+
+    int box_h = max_y < 10 ? max_y : 10;
+    int box_w = max_x < 40 ? max_x : max_x / 2;
     int start_y = (max_y - box_h) / 2;
     int start_x = (max_x - box_w) / 2;
-    
+
     WINDOW *win = newwin(box_h, box_w, start_y, start_x);
+    if (!win) {
+        mvaddnstr(max_y - 1, 0, safe_message, max_x);
+        refresh();
+        getch();
+        return;
+    }
     box(win, 0, 0);
-    
-    mvwprintw(win, 0, 2, " %s ", title);
-    
+
+    mvwaddnstr(win, 0, 2, safe_title, box_w - 4);
+
     int m_y = 2;
-    char *msg_copy = strdup(message);
+    char *msg_copy = strdup(safe_message);
+    if (!msg_copy) {
+        delwin(win);
+        return;
+    }
     char *line = strtok(msg_copy, "\n");
     while (line != NULL && m_y < box_h - 2) {
-        mvwprintw(win, m_y++, 2, "%.*s", box_w - 4, line);
+        mvwaddnstr(win, m_y++, 2, line, box_w - 4);
         line = strtok(NULL, "\n");
     }
     free(msg_copy);
-    
-    mvwprintw(win, box_h - 2, 2, "[ Press any key to close ]");
-    
+
+    mvwaddnstr(win, box_h - 2, 2, "[ Press any key to close ]", box_w - 4);
+
     wrefresh(win);
     wgetch(win);
     delwin(win);
