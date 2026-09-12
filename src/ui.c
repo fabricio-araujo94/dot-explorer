@@ -108,6 +108,11 @@ void ui_render_filter_prompt(const char *query) {
 
 bool ui_prompt(const char *prompt, char *buffer, size_t buf_size) {
     int max_y, max_x;
+    int ret;
+
+    if (!buffer || buf_size < 2) {
+        return false;
+    }
     getmaxyx(stdscr, max_y, max_x);
     
     int prompt_y = max_y - 2;
@@ -118,8 +123,10 @@ bool ui_prompt(const char *prompt, char *buffer, size_t buf_size) {
     
     echo();
     curs_set(1);
-    
-    int ret = getnstr(buffer, buf_size - 1);
+
+    timeout(-1);
+    ret = getnstr(buffer, (int)buf_size - 1);
+    timeout(100);
     
     noecho();
     curs_set(0);
