@@ -301,6 +301,19 @@ bool clipboard_apply_operation(Clipboard *clipboard, const char *destination_dir
         }
         if (clipboard->is_cut) {
             if (rename(source, destination) != 0) {
+                int rename_errno = errno;
+                if (rename_errno == EXDEV) {
+                    if (!fs_copy_recursive(source, destination)) {
+                        set_error_path(error_path, error_path_size, source);
+                        return false;
+                    }
+                    if (!fs_delete_recursive(source)) {
+                        set_error_path(error_path, error_path_size, source);
+                        return false;
+                    }
+                    continue;
+                }
+                errno = rename_errno;
                 set_error_path(error_path, error_path_size, source);
                 return false;
             }

@@ -126,6 +126,32 @@ static void test_clipboard_apply_between_directories(void) {
     teardown();
 }
 
+static void test_clipboard_cut_same_filesystem(void) {
+    Clipboard clipboard = { 0 };
+    char source_dir[PATH_MAX];
+    char destination_dir[PATH_MAX];
+    char source_file[PATH_MAX];
+    char moved_file[PATH_MAX];
+    char error_path[PATH_MAX];
+
+    setup();
+    make_path(source_dir, sizeof(source_dir), "cut-source");
+    make_path(destination_dir, sizeof(destination_dir), "cut-destination");
+    assert(mkdir(source_dir, 0700) == 0);
+    assert(mkdir(destination_dir, 0700) == 0);
+    assert(utils_join_path(source_file, sizeof(source_file), source_dir, "item.txt"));
+    write_file(source_file, "move");
+    assert(clipboard_add_entry(&clipboard, source_file));
+    clipboard.is_cut = true;
+    assert(clipboard_apply_operation(&clipboard, destination_dir,
+                                     error_path, sizeof(error_path)));
+    assert(utils_join_path(moved_file, sizeof(moved_file), destination_dir, "item.txt"));
+    assert(access(moved_file, F_OK) == 0);
+    assert(access(source_file, F_OK) != 0);
+    assert(clipboard.count == 0);
+    teardown();
+}
+
 static void test_permission_denied(void) {
 #ifdef _WIN32
     return;
@@ -169,6 +195,7 @@ int main(void) {
     test_delete_parent_path_is_blocked();
     test_copy_into_itself();
     test_clipboard_apply_between_directories();
+    test_clipboard_cut_same_filesystem();
     test_permission_denied();
     test_path_near_path_max();
     puts("test_fs: all tests passed");
