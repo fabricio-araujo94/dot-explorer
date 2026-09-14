@@ -275,16 +275,16 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
     }
 
     switch (ch) {
-        case KEY_QUIT:
+        case DOT_KEY_QUIT:
             state->should_quit = true;
             break;
             
-        case KEY_UP_DIR:
+        case DOT_KEY_UP_DIR:
         case KEY_UP:
             move_visible_selection(state, current_view_index(state) - 1, list_height);
             break;
 
-        case KEY_DOWN_DIR:
+        case DOT_KEY_DOWN_DIR:
         case KEY_DOWN:
             move_visible_selection(state, current_view_index(state) + 1, list_height);
             break;
@@ -293,7 +293,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             filter_prompt(state);
             break;
 
-        case KEY_ENTER_DIR:
+        case DOT_KEY_ENTER_DIR:
         case KEY_RIGHT:
             if (state->dir_list.count > 0) {
                 const FileEntry *entry = &state->dir_list.entries[state->selected_index];
@@ -312,7 +312,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             }
             break;
 
-        case KEY_BACK_DIR:
+        case DOT_KEY_BACK_DIR:
         case KEY_LEFT:
         case KEY_BACKSPACE:
             state_change_dir(state, "..");
@@ -326,11 +326,11 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             navigate_history(state, true);
             break;
             
-        case KEY_REFRESH:
+        case DOT_KEY_REFRESH:
             state_change_dir(state, ".");
             break;
 
-        case KEY_SELECT:
+        case DOT_KEY_SELECT:
             if (state->dir_list.count > 0) {
                 FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 entry->is_selected = !entry->is_selected;
@@ -343,7 +343,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             }
             break;
 
-        case KEY_DELETE_ITEM:
+        case DOT_KEY_DELETE_ITEM:
             if (state->dir_list.count > 0) {
                 FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 char buf[256];
@@ -360,7 +360,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             }
             break;
 
-        case KEY_RENAME_ITEM:
+        case DOT_KEY_RENAME_ITEM:
             if (state->dir_list.count > 0) {
                 FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 char new_name[256];
@@ -378,7 +378,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             }
             break;
 
-        case KEY_CREATE_FILE:
+        case DOT_KEY_CREATE_FILE:
             {
                 char name[256];
                 if (ui_prompt("New file name: ", name, sizeof(name))) {
@@ -390,7 +390,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             }
             break;
 
-        case KEY_CREATE_DIR:
+        case DOT_KEY_CREATE_DIR:
             {
                 char name[256];
                 if (ui_prompt("New directory name: ", name, sizeof(name))) {
@@ -402,22 +402,22 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             }
             break;
 
-        case KEY_SORT_NAME:
+        case DOT_KEY_SORT_NAME:
             state->sort_type = SORT_NAME;
             fs_sort_dir_list(&state->dir_list, state->sort_type);
             break;
 
-        case KEY_SORT_SIZE:
+        case DOT_KEY_SORT_SIZE:
             state->sort_type = SORT_SIZE;
             fs_sort_dir_list(&state->dir_list, state->sort_type);
             break;
 
-        case KEY_SORT_DATE:
+        case DOT_KEY_SORT_DATE:
             state->sort_type = SORT_DATE;
             fs_sort_dir_list(&state->dir_list, state->sort_type);
             break;
 
-        case KEY_COPY:
+        case DOT_KEY_COPY:
             if (state->dir_list.count > 0) {
                 if (!capture_clipboard(state, clipboard, false) &&
                     is_navigation_entry(&state->dir_list.entries[state->selected_index])) {
@@ -426,7 +426,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             }
             break;
 
-        case KEY_CUT:
+        case DOT_KEY_CUT:
             if (state->dir_list.count > 0) {
                 if (!capture_clipboard(state, clipboard, true) &&
                     is_navigation_entry(&state->dir_list.entries[state->selected_index])) {
@@ -435,7 +435,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             }
             break;
 
-        case KEY_PASTE:
+        case DOT_KEY_PASTE:
             if (clipboard && clipboard->count > 0) {
                 char error_path[PATH_MAX];
                 if (!clipboard_apply_operation(clipboard, state->current_path,
@@ -446,7 +446,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             }
             break;
 
-        case KEY_PROPERTIES:
+        case DOT_KEY_PROPERTIES:
             if (state->dir_list.count > 0) {
                 FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 char size_str[64];

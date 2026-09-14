@@ -328,7 +328,7 @@ void ui_handle_input(DualPaneUI *ui, int ch) {
         ui->active_pane_index = 1 - ui->active_pane_index;
         return;
     }
-    if (ch == KEY_PASTE && ui->clipboard.count > 0) {
+    if (ch == DOT_KEY_PASTE && ui->clipboard.count > 0) {
         if (!ui->clipboard.is_cut && ui->clipboard.count == 1) {
             char destination[PATH_MAX];
             const char *source = ui->clipboard.paths[0];
@@ -352,7 +352,7 @@ void ui_handle_input(DualPaneUI *ui, int ch) {
         pane_sync(active);
         return;
     }
-    if (ch != KEY_PASTE) {
+    if (ch != DOT_KEY_PASTE) {
         input_handle(&active->state, &ui->clipboard, ch);
     }
     pane_sync(active);
