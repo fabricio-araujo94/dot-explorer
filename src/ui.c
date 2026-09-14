@@ -299,9 +299,14 @@ void ui_draw(DualPaneUI *ui) {
             mvprintw(max_y - 1, 1, "Copy cancelled");
         }
         if (status == TASK_COMPLETED && ui->task_refresh_pending) {
-            Pane *destination = &ui->panes[ui->task_destination_pane];
-            state_change_dir(&destination->state, ".");
-            pane_sync(destination);
+            if (ui->task_destination_pane >= 0 && ui->task_destination_pane < 2) {
+                Pane *destination = &ui->panes[ui->task_destination_pane];
+                state_change_dir(&destination->state, ".");
+                pane_sync(destination);
+            }
+            ui->task_refresh_pending = false;
+        } else if ((status == TASK_FAILED || status == TASK_CANCELLED) &&
+                   ui->task_refresh_pending) {
             ui->task_refresh_pending = false;
         }
         if (status != TASK_RUNNING && status != TASK_IDLE) {
