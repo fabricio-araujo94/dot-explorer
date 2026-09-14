@@ -283,7 +283,8 @@ static bool copy_tree(const char *src_path, const char *dest_path,
     if (S_ISDIR(source_stat.st_mode)) {
         DIR *dir;
         struct dirent *entry;
-        if (platform_mkdir(dest_path, source_stat.st_mode & 07777) != 0 && errno != EEXIST) {
+        mode_t temp_mode = (source_stat.st_mode & 07777) | S_IRWXU;
+        if (platform_mkdir(dest_path, temp_mode) != 0 && errno != EEXIST) {
             set_error_path(error_path, error_path_size, dest_path);
             return false;
         }

@@ -220,6 +220,48 @@ static void test_async_task_lifecycle(void) {
     teardown();
 }
 
+static void test_copy_readonly_directory(void) {
+#ifdef _WIN32
+    return;
+#else
+    char src_dir[PATH_MAX];
+    char src_file[PATH_MAX];
+    char dst_dir[PATH_MAX];
+    char dst_file[PATH_MAX];
+    struct stat st;
+
+    setup();
+    if (geteuid() == 0) {
+        teardown();
+        return;
+    }
+    make_path(src_dir, sizeof(src_dir), "readonly_dir");
+    make_path(dst_dir, sizeof(dst_dir), "readonly_copy");
+    assert(mkdir(src_dir, 0700) == 0);
+    assert(utils_join_path(src_file, sizeof(src_file), src_dir, "data.txt"));
+    write_file(src_file, "read-only directory test data");
+
+    /* Set source directory permissions to read-only for owner (0555) */
+    assert(chmod(src_dir, 0555) == 0);
+
+    /* Copy recursive should succeed */
+    assert(fs_copy_recursive(src_dir, dst_dir));
+
+    /* Check destination file exists and matches */
+    assert(utils_join_path(dst_file, sizeof(dst_file), dst_dir, "data.txt"));
+    assert(access(dst_file, F_OK) == 0);
+
+    /* Check destination directory permissions preserved final mode (0555) */
+    assert(stat(dst_dir, &st) == 0);
+    assert((st.st_mode & 07777) == 0555);
+
+    /* Restore write permissions before teardown cleanup */
+    assert(chmod(src_dir, 0700) == 0);
+    assert(chmod(dst_dir, 0700) == 0);
+    teardown();
+#endif
+}
+
 int main(void) {
     test_delete_circular_symlinks();
     test_delete_parent_path_is_blocked();
@@ -227,6 +269,7 @@ int main(void) {
     test_clipboard_apply_between_directories();
     test_clipboard_cut_same_filesystem();
     test_permission_denied();
+    test_copy_readonly_directory();
     test_async_task_lifecycle();
     test_path_near_path_max();
     puts("test_fs: all tests passed");
