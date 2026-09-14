@@ -262,6 +262,58 @@ static void test_copy_readonly_directory(void) {
 #endif
 }
 
+static void test_sort_dotdot_stays_first(void) {
+    DirectoryList list;
+    fs_init_dir_list(&list);
+
+    /* Allocate and mock entries: ".." with small/large timestamps & sizes and several directories & files */
+    list.count = 5;
+    
+    /* entry 0: ".." (dir, large size, old timestamp) */
+    strcpy(list.entries[0].name, "..");
+    list.entries[0].is_dir = true;
+    list.entries[0].size = 999999;
+    list.entries[0].mtime = 1000;
+
+    /* entry 1: "alpha_dir" (dir, smaller size, newer timestamp) */
+    strcpy(list.entries[1].name, "alpha_dir");
+    list.entries[1].is_dir = true;
+    list.entries[1].size = 10;
+    list.entries[1].mtime = 5000;
+
+    /* entry 2: "beta_dir" (dir, large size, newest timestamp) */
+    strcpy(list.entries[2].name, "beta_dir");
+    list.entries[2].is_dir = true;
+    list.entries[2].size = 50000;
+    list.entries[2].mtime = 9000;
+
+    /* entry 3: "a_file.txt" (file, small size, newest timestamp) */
+    strcpy(list.entries[3].name, "a_file.txt");
+    list.entries[3].is_dir = false;
+    list.entries[3].size = 5;
+    list.entries[3].mtime = 9999;
+
+    /* entry 4: "z_file.txt" (file, huge size, old timestamp) */
+    strcpy(list.entries[4].name, "z_file.txt");
+    list.entries[4].is_dir = false;
+    list.entries[4].size = 10000000;
+    list.entries[4].mtime = 100;
+
+    /* Sort by NAME */
+    fs_sort_dir_list(&list, SORT_NAME);
+    assert(strcmp(list.entries[0].name, "..") == 0);
+
+    /* Sort by SIZE */
+    fs_sort_dir_list(&list, SORT_SIZE);
+    assert(strcmp(list.entries[0].name, "..") == 0);
+
+    /* Sort by DATE */
+    fs_sort_dir_list(&list, SORT_DATE);
+    assert(strcmp(list.entries[0].name, "..") == 0);
+
+    fs_free_dir_list(&list);
+}
+
 int main(void) {
     test_delete_circular_symlinks();
     test_delete_parent_path_is_blocked();
@@ -270,6 +322,7 @@ int main(void) {
     test_clipboard_cut_same_filesystem();
     test_permission_denied();
     test_copy_readonly_directory();
+    test_sort_dotdot_stays_first();
     test_async_task_lifecycle();
     test_path_near_path_max();
     puts("test_fs: all tests passed");

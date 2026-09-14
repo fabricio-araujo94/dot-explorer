@@ -361,6 +361,9 @@ static int compare_entries(const void *a, const void *b) {
     const FileEntry *entryA = (const FileEntry *)a;
     const FileEntry *entryB = (const FileEntry *)b;
 
+    if (strcmp(entryA->name, "..") == 0) return -1;
+    if (strcmp(entryB->name, "..") == 0) return 1;
+
     if (entryA->is_dir && !entryB->is_dir) return -1;
     if (!entryA->is_dir && entryB->is_dir) return 1;
 
