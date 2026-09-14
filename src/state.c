@@ -356,6 +356,17 @@ void state_cleanup(AppState *state) {
 }
 void state_change_dir(AppState *state, const char *new_path) {
     char target_path[PATH_MAX];
+    bool is_refresh = (strcmp(new_path, ".") == 0);
+    char saved_selected_name[256] = "";
+    int old_selected_index = state->selected_index;
+    int old_scroll_offset = state->scroll_offset;
+
+    if (is_refresh && state->dir_list.count > 0 &&
+        state->selected_index >= 0 && state->selected_index < state->dir_list.count) {
+        strncpy(saved_selected_name, state->dir_list.entries[state->selected_index].name,
+                sizeof(saved_selected_name) - 1);
+        saved_selected_name[sizeof(saved_selected_name) - 1] = '\0';
+    }
 
     if (new_path[0] == '/') {
         strncpy(target_path, new_path, sizeof(target_path) - 1);
@@ -382,8 +393,28 @@ void state_change_dir(AppState *state, const char *new_path) {
             state->current_path[sizeof(state->current_path) - 1] = '\0';
         }
 
-        state->selected_index = 0;
-        state->scroll_offset = 0;
+        if (is_refresh && state->dir_list.count > 0) {
+            int restored_index = -1;
+            if (saved_selected_name[0] != '\0') {
+                for (int i = 0; i < state->dir_list.count; ++i) {
+                    if (strcmp(state->dir_list.entries[i].name, saved_selected_name) == 0) {
+                        restored_index = i;
+                        break;
+                    }
+                }
+            }
+            if (restored_index >= 0) {
+                state->selected_index = restored_index;
+            } else {
+                state->selected_index = old_selected_index < state->dir_list.count ?
+                                        old_selected_index : state->dir_list.count - 1;
+            }
+            state->scroll_offset = old_scroll_offset <= state->selected_index ?
+                                   old_scroll_offset : state->selected_index;
+        } else {
+            state->selected_index = 0;
+            state->scroll_offset = 0;
+        }
         state->filter_active = false;
         state->filter_query[0] = '\0';
         entry_list_clear(&state->filtered_entries);

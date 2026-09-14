@@ -314,6 +314,47 @@ static void test_sort_dotdot_stays_first(void) {
     fs_free_dir_list(&list);
 }
 
+static void test_refresh_preserves_selection_and_scroll(void) {
+    AppState state;
+    char file1[PATH_MAX];
+    char file2[PATH_MAX];
+    char file3[PATH_MAX];
+
+    setup();
+    make_path(file1, sizeof(file1), "a_first.txt");
+    make_path(file2, sizeof(file2), "b_second.txt");
+    make_path(file3, sizeof(file3), "c_third.txt");
+    write_file(file1, "1");
+    write_file(file2, "2");
+    write_file(file3, "3");
+
+    state_init(&state);
+    state_change_dir(&state, TEST_ROOT);
+    assert(state.dir_list.count >= 4); /* .., a, b, c */
+
+    /* Find b_second.txt and select it */
+    int target_idx = -1;
+    for (int i = 0; i < state.dir_list.count; ++i) {
+        if (strcmp(state.dir_list.entries[i].name, "b_second.txt") == 0) {
+            target_idx = i;
+            break;
+        }
+    }
+    assert(target_idx >= 0);
+    state.selected_index = target_idx;
+    state.scroll_offset = 1;
+
+    /* Refresh directory with "." */
+    state_change_dir(&state, ".");
+
+    /* Selection on b_second.txt and scroll_offset should be preserved */
+    assert(strcmp(state.dir_list.entries[state.selected_index].name, "b_second.txt") == 0);
+    assert(state.scroll_offset == 1);
+
+    state_cleanup(&state);
+    teardown();
+}
+
 int main(void) {
     test_delete_circular_symlinks();
     test_delete_parent_path_is_blocked();
@@ -323,6 +364,7 @@ int main(void) {
     test_permission_denied();
     test_copy_readonly_directory();
     test_sort_dotdot_stays_first();
+    test_refresh_preserves_selection_and_scroll();
     test_async_task_lifecycle();
     test_path_near_path_max();
     puts("test_fs: all tests passed");
