@@ -345,17 +345,44 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
 
         case DOT_KEY_DELETE_ITEM:
             if (state->dir_list.count > 0) {
-                FileEntry *entry = &state->dir_list.entries[state->selected_index];
-                char buf[256];
-                if (is_navigation_entry(entry)) {
-                    ui_show_message("Delete blocked", "Navigation entries cannot be deleted.");
-                    break;
+                int selected_count = 0;
+                for (int i = 0; i < state->dir_list.count; ++i) {
+                    if (state->dir_list.entries[i].is_selected &&
+                        !is_navigation_entry(&state->dir_list.entries[i])) {
+                        selected_count++;
+                    }
                 }
-                if (ui_prompt("Delete item? (y/n): ", buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
-                    char full_path[PATH_MAX];
-                    utils_join_path(full_path, sizeof(full_path), state->current_path, entry->name);
-                    fs_delete(full_path);
-                    state_change_dir(state, ".");
+
+                char prompt_msg[256];
+                char buf[256];
+
+                if (selected_count > 0) {
+                    snprintf(prompt_msg, sizeof(prompt_msg),
+                             "Delete %d selected item%s? (y/n): ",
+                             selected_count, selected_count > 1 ? "s" : "");
+                    if (ui_prompt(prompt_msg, buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
+                        for (int i = 0; i < state->dir_list.count; ++i) {
+                            FileEntry *entry = &state->dir_list.entries[i];
+                            if (entry->is_selected && !is_navigation_entry(entry)) {
+                                char full_path[PATH_MAX];
+                                utils_join_path(full_path, sizeof(full_path), state->current_path, entry->name);
+                                fs_delete(full_path);
+                            }
+                        }
+                        state_change_dir(state, ".");
+                    }
+                } else {
+                    FileEntry *entry = &state->dir_list.entries[state->selected_index];
+                    if (is_navigation_entry(entry)) {
+                        ui_show_message("Delete blocked", "Navigation entries cannot be deleted.");
+                        break;
+                    }
+                    if (ui_prompt("Delete item? (y/n): ", buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
+                        char full_path[PATH_MAX];
+                        utils_join_path(full_path, sizeof(full_path), state->current_path, entry->name);
+                        fs_delete(full_path);
+                        state_change_dir(state, ".");
+                    }
                 }
             }
             break;
