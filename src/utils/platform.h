@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #ifdef _WIN32
@@ -45,8 +46,19 @@ static inline bool platform_realpath(const char *path, char *resolved, size_t si
     }
     return true;
 #else
-    (void)size;
-    return realpath(path, resolved) != NULL;
+    char *tmp;
+    if (!path || !resolved || size == 0) return false;
+    tmp = realpath(path, NULL);
+    if (!tmp) return false;
+    if (strlen(tmp) >= size) {
+        free(tmp);
+        resolved[0] = '\0';
+        errno = ENAMETOOLONG;
+        return false;
+    }
+    memcpy(resolved, tmp, strlen(tmp) + 1);
+    free(tmp);
+    return true;
 #endif
 }
 
