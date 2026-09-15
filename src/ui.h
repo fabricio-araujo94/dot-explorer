@@ -26,7 +26,7 @@ typedef struct {
 
 void ui_init(void);
 void ui_cleanup(void);
-void ui_render(const AppState *state);
+
 void ui_draw(DualPaneUI *ui);
 void ui_dual_init(DualPaneUI *ui);
 void ui_dual_cleanup(DualPaneUI *ui);

@@ -307,7 +307,9 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             navigate_history(state, false);
             break;
 
-        case 9:
+        /* Forward history: Tab (9) is consumed by ui_handle_input for
+           pane switching, so we use Ctrl+] (29) instead. */
+        case 29:
             navigate_history(state, true);
             break;
             

@@ -47,7 +47,7 @@ bool fs_create_dir(const char *path);
 bool fs_delete(const char *path);
 bool fs_delete_recursive(const char *path);
 bool fs_rename(const char *old_path, const char *new_path);
-bool fs_copy(const char *src_path, const char *dest_path);
+
 bool fs_copy_recursive(const char *src_path, const char *dest_path);
 bool fs_copy_recursive_with_options(const char *src_path, const char *dest_path,
                                     const FsCopyOptions *options,

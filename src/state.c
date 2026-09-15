@@ -274,15 +274,6 @@ void clipboard_clear(Clipboard *clipboard) {
     clipboard->source_dir[0] = '\0';
 }
 
-void clipboard_invert_selection(DirectoryList *list) {
-    if (!list) {
-        return;
-    }
-    for (int i = 0; i < list->count; ++i) {
-        list->entries[i].is_selected = !list->entries[i].is_selected;
-    }
-}
-
 bool clipboard_apply_operation(Clipboard *clipboard, const char *destination_dir,
                                char *error_path, size_t error_path_size) {
     if (!clipboard || !destination_dir || !*destination_dir ||

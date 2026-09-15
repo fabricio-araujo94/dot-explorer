@@ -33,67 +33,7 @@ void ui_cleanup(void) {
     endwin();
 }
 
-static void render_status_bar(const AppState *state, int max_y, int max_x) {
-    attron(COLOR_PAIR(4));
-    mvhline(max_y - 1, 0, ' ', max_x);
-    
-    mvprintw(max_y - 1, 0, " %.*s | %d items ", max_x - 1,
-             state->current_path, state_visible_count(state));
-    
-    char right_status[128];
-    snprintf(right_status, sizeof(right_status), " %s v%s ", APP_NAME, APP_VERSION);
-    int len = strlen(right_status);
-    if (max_x > len) {
-        mvprintw(max_y - 1, max_x - len, "%s", right_status);
-    }
-    attroff(COLOR_PAIR(4));
-}
 
-void ui_render(const AppState *state) {
-    int max_y, max_x;
-    getmaxyx(stdscr, max_y, max_x);
-
-    erase();
-
-    int list_height = max_y - 1;
-    
-    for (int i = 0; i < list_height && (i + state->scroll_offset) < state_visible_count(state); ++i) {
-        int view_index = i + state->scroll_offset;
-        int idx = state_visible_index(state, view_index);
-        const FileEntry *entry = &state->dir_list.entries[idx];
-
-        bool is_selected = (idx == state->selected_index);
-        
-        if (is_selected) {
-            attron(COLOR_PAIR(3) | A_BOLD);
-            mvhline(i, 0, ' ', max_x);
-        } else {
-            if (entry->is_dir) {
-                attron(COLOR_PAIR(1) | A_BOLD);
-            } else {
-                attron(COLOR_PAIR(2));
-            }
-        }
-
-        char dir_prefix = entry->is_dir ? '/' : ' ';
-        char sel_prefix = entry->is_selected ? '*' : ' ';
-        mvprintw(i, 0, "%c%c %s", sel_prefix, dir_prefix, entry->name);
-
-        if (is_selected) {
-            attroff(COLOR_PAIR(3) | A_BOLD);
-        } else {
-            if (entry->is_dir) {
-                attroff(COLOR_PAIR(1) | A_BOLD);
-            } else {
-                attroff(COLOR_PAIR(2));
-            }
-        }
-    }
-
-    render_status_bar(state, max_y, max_x);
-
-    refresh();
-}
 
 void ui_render_filter_prompt(const char *query) {
     int max_y, max_x;

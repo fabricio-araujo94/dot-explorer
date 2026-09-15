@@ -25,8 +25,6 @@
 #define PLATFORM_PATH_SEPARATOR_STRING "/"
 #endif
 
-typedef bool (*platform_drive_callback)(const char *path, void *context);
-
 static inline int platform_mkdir(const char *path, mode_t mode) {
 #ifdef _WIN32
     (void)mode;
@@ -50,23 +48,6 @@ static inline bool platform_realpath(const char *path, char *resolved, size_t si
     (void)size;
     return realpath(path, resolved) != NULL;
 #endif
-}
-
-static inline bool platform_list_drives(platform_drive_callback callback, void *context) {
-    if (!callback) return false;
-#ifdef _WIN32
-    {
-        DWORD mask = GetLogicalDrives();
-        if (mask == 0) return false;
-        for (unsigned int i = 0; i < 26; ++i) {
-            char drive[4] = { (char)('A' + i), ':', '\\', '\0' };
-            if ((mask & (1u << i)) != 0 && !callback(drive, context)) return false;
-        }
-    }
-#else
-    return callback("/", context);
-#endif
-    return true;
 }
 
 #endif // DOT_EXPLORER_PLATFORM_H

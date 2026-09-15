@@ -55,7 +55,7 @@ int state_visible_count(const AppState *state);
 int state_visible_index(const AppState *state, int view_index);
 bool clipboard_add_entry(Clipboard *clipboard, const char *path);
 void clipboard_clear(Clipboard *clipboard);
-void clipboard_invert_selection(DirectoryList *list);
+
 bool clipboard_apply_operation(Clipboard *clipboard, const char *destination_dir,
                                char *error_path, size_t error_path_size);
 bool history_push(AppState *state, const char *path, int selected_index);

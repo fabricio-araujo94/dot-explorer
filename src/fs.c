@@ -491,12 +491,7 @@ bool fs_rename(const char *old_path, const char *new_path) {
     return rename(old_path, new_path) == 0;
 }
 
-bool fs_copy(const char *src_path, const char *dest_path) {
-    FsCopyOptions options = { false, true, NULL, NULL, NULL };
-    char error_path[PATH_MAX];
-    return fs_copy_recursive_with_options(src_path, dest_path, &options,
-                                          error_path, sizeof(error_path));
-}
+
 
 bool fs_copy_recursive(const char *src_path, const char *dest_path) {
     FsCopyOptions options = { false, true, NULL, NULL, NULL };
