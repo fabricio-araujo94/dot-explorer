@@ -1,9 +1,11 @@
 #include "state.h"
 #include "ui.h"
 #include "input.h"
+#include <locale.h>
 #include <ncurses.h>
 
 int main(void) {
+    setlocale(LC_ALL, "");
     DualPaneUI dual_pane;
 
     ui_init();

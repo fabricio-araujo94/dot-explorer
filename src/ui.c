@@ -195,6 +195,46 @@ static const char *file_extension(const char *name) {
     return dot ? dot : "";
 }
 
+#include <wchar.h>
+
+static void safe_draw_line(int y, int x, const char *str, int max_cols) {
+    if (max_cols <= 0) return;
+    int cur_col = 0;
+    mbstate_t ps;
+    memset(&ps, 0, sizeof(ps));
+    const char *p = str;
+    char chunk[PATH_MAX];
+    size_t chunk_len = 0;
+
+    while (*p && cur_col < max_cols) {
+        wchar_t wc;
+        size_t n = mbrtowc(&wc, p, strlen(p), &ps);
+        if (n == (size_t)-1 || n == (size_t)-2 || n == 0) {
+            if (cur_col + 1 <= max_cols && chunk_len + 1 < sizeof(chunk)) {
+                chunk[chunk_len++] = *p ? *p : ' ';
+                cur_col += 1;
+            }
+            if (*p) p++;
+            else break;
+            memset(&ps, 0, sizeof(ps));
+            continue;
+        }
+        int w = wcwidth(wc);
+        if (w < 0) w = 0;
+        if (cur_col + w > max_cols) {
+            break;
+        }
+        if (chunk_len + n < sizeof(chunk)) {
+            memcpy(chunk + chunk_len, p, n);
+            chunk_len += n;
+        }
+        cur_col += w;
+        p += n;
+    }
+    chunk[chunk_len] = '\0';
+    mvaddstr(y, x, chunk);
+}
+
 static void draw_pane(const Pane *pane, bool active) {
     int list_height = pane->height - 2;
     int visible_count = state_visible_count(&pane->state);
@@ -230,12 +270,11 @@ static void draw_pane(const Pane *pane, bool active) {
              theme.icon, entry->name);
         attron(attributes);
         mvhline(screen_y, pane->x + 1, ' ', content_width);
-        mvaddnstr(screen_y, pane->x + 1, line, content_width);
+        safe_draw_line(screen_y, pane->x + 1, line, content_width);
         attroff(attributes);
     }
     attron(active ? (COLOR_PAIR(3) | A_BOLD) : COLOR_PAIR(2));
-    mvaddnstr(pane->y + pane->height - 1, pane->x + 2, pane->cwd,
-              pane->width - 4);
+    safe_draw_line(pane->y + pane->height - 1, pane->x + 2, pane->cwd, pane->width - 4);
     attroff(active ? (COLOR_PAIR(3) | A_BOLD) : COLOR_PAIR(2));
 }
 
