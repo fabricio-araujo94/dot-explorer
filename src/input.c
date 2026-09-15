@@ -8,7 +8,6 @@
 #include <time.h>
 #include <ctype.h>
 
-static int escape_sequence_state;
 
 static bool is_navigation_entry(const FileEntry *entry) {
     return entry && (strcmp(entry->name, ".") == 0 ||
@@ -251,28 +250,6 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
     getmaxyx(stdscr, max_y, max_x);
     (void)max_x;
     int list_height = max_y - 1;
-
-    if (escape_sequence_state == 0 && ch == 27) {
-        escape_sequence_state = 1;
-        return;
-    }
-    if (escape_sequence_state == 1) {
-        if (ch == '[') {
-            escape_sequence_state = 2;
-            return;
-        }
-        escape_sequence_state = 0;
-    } else if (escape_sequence_state == 2) {
-        escape_sequence_state = 0;
-        if (ch == 'D') {
-            navigate_history(state, false);
-            return;
-        }
-        if (ch == 'C') {
-            navigate_history(state, true);
-            return;
-        }
-    }
 
     switch (ch) {
         case DOT_KEY_QUIT:
