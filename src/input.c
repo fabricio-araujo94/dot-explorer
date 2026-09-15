@@ -496,7 +496,11 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
                 
                 char date_str[64];
                 struct tm *tm_info = localtime(&entry->mtime);
-                strftime(date_str, sizeof(date_str), "%Y-%m-%d %H:%M:%S", tm_info);
+                if (tm_info) {
+                    strftime(date_str, sizeof(date_str), "%Y-%m-%d %H:%M:%S", tm_info);
+                } else {
+                    snprintf(date_str, sizeof(date_str), "Unknown");
+                }
 
                 char msg[512];
                 snprintf(msg, sizeof(msg),
