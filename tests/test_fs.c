@@ -355,6 +355,39 @@ static void test_refresh_preserves_selection_and_scroll(void) {
     teardown();
 }
 
+static void test_large_dir_expansion(void) {
+    char dir[PATH_MAX];
+    char file_path[PATH_MAX];
+    DirectoryList list;
+
+    setup();
+    make_path(dir, sizeof(dir), "large_dir");
+    assert(mkdir(dir, 0700) == 0);
+
+    /* Create 300 files to force multiple reallocs from base capacity 128 */
+    for (int i = 0; i < 300; ++i) {
+        char filename[64];
+        snprintf(filename, sizeof(filename), "file_%04d.txt", i);
+        assert(utils_join_path(file_path, sizeof(file_path), dir, filename));
+        write_file(file_path, "x");
+    }
+
+    fs_init_dir_list(&list);
+    assert(fs_read_dir(dir, &list));
+    /* Expect 300 files + 1 parent ("..") = 301 entries */
+    assert(list.count == 301);
+    assert(list.capacity >= 301);
+    assert(list.entries != NULL);
+    assert(strcmp(list.entries[0].name, "..") == 0);
+
+    fs_free_dir_list(&list);
+    assert(list.entries == NULL);
+    assert(list.count == 0);
+    assert(list.capacity == 0);
+
+    teardown();
+}
+
 int main(void) {
     test_delete_circular_symlinks();
     test_delete_parent_path_is_blocked();
@@ -365,6 +398,7 @@ int main(void) {
     test_copy_readonly_directory();
     test_sort_dotdot_stays_first();
     test_refresh_preserves_selection_and_scroll();
+    test_large_dir_expansion();
     test_async_task_lifecycle();
     test_path_near_path_max();
     puts("test_fs: all tests passed");

@@ -344,6 +344,9 @@ void fs_init_dir_list(DirectoryList *list) {
     list->count = 0;
     list->capacity = 128;
     list->entries = (FileEntry *)malloc(list->capacity * sizeof(FileEntry));
+    if (!list->entries) {
+        list->capacity = 0;
+    }
 }
 
 void fs_free_dir_list(DirectoryList *list) {
@@ -380,7 +383,7 @@ static int compare_entries(const void *a, const void *b) {
 
 void fs_sort_dir_list(DirectoryList *list, SortType sort_type) {
     current_sort_type = sort_type;
-    if (list->count > 0) {
+    if (list->count > 0 && list->entries) {
         qsort(list->entries, list->count, sizeof(FileEntry), compare_entries);
     }
 }
@@ -392,6 +395,17 @@ bool fs_read_dir(const char *path, DirectoryList *list) {
     }
 
     list->count = 0;
+    if (list->capacity == 0 || !list->entries) {
+        list->capacity = 128;
+        list->entries = (FileEntry *)malloc(list->capacity * sizeof(FileEntry));
+        if (!list->entries) {
+            list->capacity = 0;
+            closedir(dir);
+            errno = ENOMEM;
+            return false;
+        }
+    }
+
     struct dirent *dp;
     char full_path[PATH_MAX];
 
@@ -399,8 +413,15 @@ bool fs_read_dir(const char *path, DirectoryList *list) {
         if (strcmp(dp->d_name, ".") == 0) continue;
         
         if (list->count >= list->capacity) {
-            list->capacity *= 2;
-            list->entries = (FileEntry *)realloc(list->entries, list->capacity * sizeof(FileEntry));
+            int new_capacity = list->capacity == 0 ? 128 : list->capacity * 2;
+            FileEntry *new_entries = (FileEntry *)realloc(list->entries, (size_t)new_capacity * sizeof(FileEntry));
+            if (!new_entries) {
+                closedir(dir);
+                errno = ENOMEM;
+                return false;
+            }
+            list->entries = new_entries;
+            list->capacity = new_capacity;
         }
 
         FileEntry *entry = &list->entries[list->count];
