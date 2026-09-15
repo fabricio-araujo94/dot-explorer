@@ -48,7 +48,7 @@ typedef struct {
 
 void state_init(AppState *state);
 void state_cleanup(AppState *state);
-void state_change_dir(AppState *state, const char *new_path);
+bool state_change_dir(AppState *state, const char *new_path);
 void entry_list_clear(EntryList *list);
 bool filter_entries(const char *query, const DirectoryList *source, EntryList *list);
 int state_visible_count(const AppState *state);

@@ -276,7 +276,11 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
                 const FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 if (entry->is_dir) {
                     history_push(state, state->current_path, state->selected_index);
-                    state_change_dir(state, entry->name);
+                    if (!state_change_dir(state, entry->name)) {
+                        char message[PATH_MAX + 64];
+                        snprintf(message, sizeof(message), "%s: %s", entry->name, strerror(errno));
+                        ui_show_message("Navigation failed", message);
+                    }
                 } else {
                     char path[PATH_MAX];
                     if (utils_join_path(path, sizeof(path), state->current_path, entry->name) &&
@@ -292,7 +296,11 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
         case DOT_KEY_BACK_DIR:
         case KEY_LEFT:
         case KEY_BACKSPACE:
-            state_change_dir(state, "..");
+            if (!state_change_dir(state, "..")) {
+                char message[PATH_MAX + 64];
+                snprintf(message, sizeof(message), "..: %s", strerror(errno));
+                ui_show_message("Navigation failed", message);
+            }
             break;
 
         case 15:
@@ -304,7 +312,11 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             break;
             
         case DOT_KEY_REFRESH:
-            state_change_dir(state, ".");
+            if (!state_change_dir(state, ".")) {
+                char message[PATH_MAX + 64];
+                snprintf(message, sizeof(message), "%s", strerror(errno));
+                ui_show_message("Refresh failed", message);
+            }
             break;
 
         case DOT_KEY_SELECT:
@@ -338,13 +350,21 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
                              "Delete %d selected item%s? (y/n): ",
                              selected_count, selected_count > 1 ? "s" : "");
                     if (ui_prompt(prompt_msg, buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
+                        bool any_fail = false;
+                        char fail_msg[PATH_MAX + 64] = "";
                         for (int i = 0; i < state->dir_list.count; ++i) {
                             FileEntry *entry = &state->dir_list.entries[i];
                             if (entry->is_selected && !is_navigation_entry(entry)) {
                                 char full_path[PATH_MAX];
                                 utils_join_path(full_path, sizeof(full_path), state->current_path, entry->name);
-                                fs_delete(full_path);
+                                if (!fs_delete(full_path)) {
+                                    any_fail = true;
+                                    snprintf(fail_msg, sizeof(fail_msg), "%s: %s", entry->name, strerror(errno));
+                                }
                             }
+                        }
+                        if (any_fail) {
+                            ui_show_message("Delete failed", fail_msg);
                         }
                         state_change_dir(state, ".");
                     }
@@ -357,7 +377,11 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
                     if (ui_prompt("Delete item? (y/n): ", buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
                         char full_path[PATH_MAX];
                         utils_join_path(full_path, sizeof(full_path), state->current_path, entry->name);
-                        fs_delete(full_path);
+                        if (!fs_delete(full_path)) {
+                            char msg[PATH_MAX + 64];
+                            snprintf(msg, sizeof(msg), "%s: %s", entry->name, strerror(errno));
+                            ui_show_message("Delete failed", msg);
+                        }
                         state_change_dir(state, ".");
                     }
                 }
@@ -376,7 +400,11 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
                     char old_path[PATH_MAX], new_path[PATH_MAX];
                     utils_join_path(old_path, sizeof(old_path), state->current_path, entry->name);
                     utils_join_path(new_path, sizeof(new_path), state->current_path, new_name);
-                    fs_rename(old_path, new_path);
+                    if (!fs_rename(old_path, new_path)) {
+                        char msg[PATH_MAX + 64];
+                        snprintf(msg, sizeof(msg), "%s: %s", new_name, strerror(errno));
+                        ui_show_message("Rename failed", msg);
+                    }
                     state_change_dir(state, ".");
                 }
             }
@@ -388,7 +416,11 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
                 if (ui_prompt("New file name: ", name, sizeof(name))) {
                     char full_path[PATH_MAX];
                     utils_join_path(full_path, sizeof(full_path), state->current_path, name);
-                    fs_create_file(full_path);
+                    if (!fs_create_file(full_path)) {
+                        char msg[PATH_MAX + 64];
+                        snprintf(msg, sizeof(msg), "%s: %s", name, strerror(errno));
+                        ui_show_message("Create file failed", msg);
+                    }
                     state_change_dir(state, ".");
                 }
             }
@@ -400,7 +432,11 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
                 if (ui_prompt("New directory name: ", name, sizeof(name))) {
                     char full_path[PATH_MAX];
                     utils_join_path(full_path, sizeof(full_path), state->current_path, name);
-                    fs_create_dir(full_path);
+                    if (!fs_create_dir(full_path)) {
+                        char msg[PATH_MAX + 64];
+                        snprintf(msg, sizeof(msg), "%s: %s", name, strerror(errno));
+                        ui_show_message("Create directory failed", msg);
+                    }
                     state_change_dir(state, ".");
                 }
             }

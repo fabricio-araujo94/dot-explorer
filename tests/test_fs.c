@@ -388,6 +388,38 @@ static void test_large_dir_expansion(void) {
     teardown();
 }
 
+static void test_state_change_dir_permission_denied(void) {
+#ifdef _WIN32
+    return;
+#else
+    AppState state;
+    char unreadable_dir[PATH_MAX];
+
+    setup();
+    if (geteuid() == 0) {
+        teardown();
+        return;
+    }
+    make_path(unreadable_dir, sizeof(unreadable_dir), "unreadable");
+    assert(mkdir(unreadable_dir, 0000) == 0);
+
+    state_init(&state);
+    state_change_dir(&state, TEST_ROOT);
+
+    /* Changing into unreadable directory must fail and return false */
+    errno = 0;
+    assert(!state_change_dir(&state, unreadable_dir));
+    assert(errno == EACCES);
+
+    /* State path remains in previous valid directory */
+    assert(strcmp(state.current_path, TEST_ROOT) == 0);
+
+    assert(chmod(unreadable_dir, 0700) == 0);
+    state_cleanup(&state);
+    teardown();
+#endif
+}
+
 int main(void) {
     test_delete_circular_symlinks();
     test_delete_parent_path_is_blocked();
@@ -399,6 +431,7 @@ int main(void) {
     test_sort_dotdot_stays_first();
     test_refresh_preserves_selection_and_scroll();
     test_large_dir_expansion();
+    test_state_change_dir_permission_denied();
     test_async_task_lifecycle();
     test_path_near_path_max();
     puts("test_fs: all tests passed");

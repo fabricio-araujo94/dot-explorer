@@ -354,7 +354,7 @@ void state_cleanup(AppState *state) {
                         &state->history.forward_capacity);
     fs_free_dir_list(&state->dir_list);
 }
-void state_change_dir(AppState *state, const char *new_path) {
+bool state_change_dir(AppState *state, const char *new_path) {
     char target_path[PATH_MAX];
     bool is_refresh = (strcmp(new_path, ".") == 0);
     char saved_selected_name[256] = "";
@@ -372,7 +372,7 @@ void state_change_dir(AppState *state, const char *new_path) {
         strncpy(target_path, new_path, sizeof(target_path) - 1);
     } else {
         if (!utils_join_path(target_path, sizeof(target_path), state->current_path, new_path)) {
-            return;
+            return false;
         }
     }
     target_path[sizeof(target_path) - 1] = '\0';
@@ -418,7 +418,9 @@ void state_change_dir(AppState *state, const char *new_path) {
         state->filter_active = false;
         state->filter_query[0] = '\0';
         entry_list_clear(&state->filtered_entries);
+        return true;
     } else {
         fs_free_dir_list(&new_list);
+        return false;
     }
 }
