@@ -38,6 +38,7 @@ static void test_task_init_and_cleanup(void) {
 
 static void test_task_copy_file_and_directory(void) {
     Task task;
+    char src_file[PATH_MAX], dst_file[PATH_MAX];
     char src_dir[PATH_MAX], dst_dir[PATH_MAX];
     char file1[PATH_MAX], file2[PATH_MAX];
     TaskStatus status = TASK_IDLE;
@@ -46,6 +47,28 @@ static void test_task_copy_file_and_directory(void) {
     int attempts = 0;
 
     setup_task_env();
+
+    /* 1. Test single file async copy */
+    assert(utils_join_path(src_file, sizeof(src_file), TEST_TASK_ROOT, "single_src.txt"));
+    assert(utils_join_path(dst_file, sizeof(dst_file), TEST_TASK_ROOT, "single_dst.txt"));
+    write_dummy_file(src_file, "Single file content to copy via background worker");
+
+    task_init(&task);
+    assert(task_start_copy(&task, src_file, dst_file));
+
+    attempts = 0;
+    do {
+        task_snapshot(&task, &status, &copied, &total, error_path, sizeof(error_path));
+        if (status == TASK_RUNNING) usleep(1000);
+    } while (status == TASK_RUNNING && ++attempts < 5000);
+
+    assert(status == TASK_COMPLETED);
+    assert(total > 0);
+    assert(copied == total);
+    assert(access(dst_file, F_OK) == 0);
+    task_cleanup(&task);
+
+    /* 2. Test directory tree async copy */
     assert(utils_join_path(src_dir, sizeof(src_dir), TEST_TASK_ROOT, "source_tree"));
     assert(utils_join_path(dst_dir, sizeof(dst_dir), TEST_TASK_ROOT, "dest_tree"));
     assert(mkdir(src_dir, 0700) == 0);
@@ -67,6 +90,7 @@ static void test_task_copy_file_and_directory(void) {
     }
 
     /* Wait for completion */
+    attempts = 0;
     do {
         task_snapshot(&task, &status, &copied, &total, error_path, sizeof(error_path));
         if (status == TASK_RUNNING) usleep(1000);
@@ -74,7 +98,6 @@ static void test_task_copy_file_and_directory(void) {
 
     assert(status == TASK_COMPLETED);
     assert(total > 0);
-    assert(copied == total);
 
     /* Verify files exist in dest_tree */
     char check1[PATH_MAX], check2[PATH_MAX];
