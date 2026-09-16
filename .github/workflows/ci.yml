@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [ gcc, clang ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libncursesw5-dev build-essential
+
+      - name: Build and Run Tests
+        env:
+          CC: ${{ matrix.compiler }}
+        run: |
+          make clean
+          make CFLAGS="-Wall -Wextra -Werror -std=c99 -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700 -g -I./include -I./src"
+          make test CFLAGS="-Wall -Wextra -Werror -std=c99 -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700 -g -I./include -I./src"
+
+      - name: Build and Run Tests with AddressSanitizer & UndefinedBehaviorSanitizer
+        env:
+          CC: ${{ matrix.compiler }}
+        run: |
+          make clean
+          make test CFLAGS="-Wall -Wextra -Werror -std=c99 -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I./include -I./src" LDFLAGS="-lncursesw -pthread -fsanitize=address,undefined"

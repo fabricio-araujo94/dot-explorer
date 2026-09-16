@@ -8,19 +8,31 @@ OBJ_DIR = obj
 SRCS = $(wildcard $(SRC_DIR)/*.c) $(wildcard $(SRC_DIR)/utils/*.c)
 OBJS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRCS))
 TARGET = dot-explorer
-TEST_TARGET = test_fs
+
+TEST_TARGETS = test_fs test_state test_utils test_task
 
 all: $(TARGET)
 
-test: $(TEST_TARGET)
-	./$(TEST_TARGET)
+test: $(TEST_TARGETS)
+	./test_fs
+	./test_state
+	./test_utils
+	./test_task
 
-$(TEST_TARGET): tests/test_fs.c src/fs.c src/state.c src/task.c src/utils.c
-	$(CC) $(CFLAGS) tests/test_fs.c src/fs.c src/state.c src/task.c src/utils.c -pthread -o $@
+test_fs: tests/test_fs.c src/fs.c src/state.c src/task.c src/utils.c
+	$(CC) $(CFLAGS) $^ -pthread -o $@
+
+test_state: tests/test_state.c src/state.c src/fs.c src/utils.c
+	$(CC) $(CFLAGS) $^ -o $@
+
+test_utils: tests/test_utils.c src/utils.c src/utils/theme.c
+	$(CC) $(CFLAGS) $^ -o $@
+
+test_task: tests/test_task.c src/task.c src/fs.c src/utils.c
+	$(CC) $(CFLAGS) $^ -pthread -o $@
 
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS)
-
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	mkdir -p $(dir $@)
@@ -30,6 +42,6 @@ $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)/utils
 
 clean:
-	rm -rf $(OBJ_DIR) $(TARGET) $(TEST_TARGET)
+	rm -rf $(OBJ_DIR) $(TARGET) $(TEST_TARGETS)
 
-.PHONY: all test clean
+.PHONY: all test clean $(TEST_TARGETS)
