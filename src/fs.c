@@ -370,8 +370,11 @@ static int compare_entries(const void *a, const void *b) {
     const FileEntry *entryA = (const FileEntry *)a;
     const FileEntry *entryB = (const FileEntry *)b;
 
-    if (strcmp(entryA->name, "..") == 0) return -1;
-    if (strcmp(entryB->name, "..") == 0) return 1;
+    bool a_is_dotdot = (strcmp(entryA->name, "..") == 0);
+    bool b_is_dotdot = (strcmp(entryB->name, "..") == 0);
+    if (a_is_dotdot && b_is_dotdot) return 0;
+    if (a_is_dotdot) return -1;
+    if (b_is_dotdot) return 1;
 
     if (entryA->is_dir && !entryB->is_dir) return -1;
     if (!entryA->is_dir && entryB->is_dir) return 1;
