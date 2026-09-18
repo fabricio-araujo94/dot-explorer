@@ -18,6 +18,7 @@
 static bool is_protected_delete_path(const char *path) {
     size_t length;
     const char *name;
+    size_t seg_len;
 
     if (!path || !*path) return true;
     length = strlen(path);
@@ -31,7 +32,9 @@ static bool is_protected_delete_path(const char *path) {
 #endif
     name = path + length;
     while (name > path && name[-1] != '/' && name[-1] != '\\') name--;
-    return strcmp(name, ".") == 0 || strcmp(name, "..") == 0;
+    seg_len = (size_t)((path + length) - name);
+    return (seg_len == 1 && name[0] == '.') ||
+           (seg_len == 2 && name[0] == '.' && name[1] == '.');
 }
 
 static bool set_error_path(char *error_path, size_t error_path_size, const char *path) {

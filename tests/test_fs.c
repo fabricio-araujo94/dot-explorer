@@ -58,7 +58,13 @@ static void test_delete_parent_path_is_blocked(void) {
     char parent[PATH_MAX];
     char child[PATH_MAX];
     char sentinel[PATH_MAX];
-    char parent_dotdot[PATH_MAX];
+    char test_paths[][PATH_MAX] = {
+        "",
+        "",
+        "",
+        "",
+        ""
+    };
 
     setup();
     make_path(parent, sizeof(parent), "parent");
@@ -67,14 +73,27 @@ static void test_delete_parent_path_is_blocked(void) {
     assert(mkdir(child, 0700) == 0);
     make_path(sentinel, sizeof(sentinel), "parent/important.txt");
     write_file(sentinel, "keep");
-    assert(utils_join_path(parent_dotdot, sizeof(parent_dotdot), parent, ".."));
+    size_t parent_len = strlen(parent);
+    assert(parent_len + 16 < PATH_MAX);
+    memcpy(test_paths[0], parent, parent_len);
+    strcpy(test_paths[0] + parent_len, "/..");
+    memcpy(test_paths[1], parent, parent_len);
+    strcpy(test_paths[1] + parent_len, "/../");
+    memcpy(test_paths[2], parent, parent_len);
+    strcpy(test_paths[2] + parent_len, "/..///");
+    memcpy(test_paths[3], parent, parent_len);
+    strcpy(test_paths[3] + parent_len, "/.");
+    memcpy(test_paths[4], parent, parent_len);
+    strcpy(test_paths[4] + parent_len, "/.//");
 
-    errno = 0;
-    assert(!fs_delete_recursive(parent_dotdot));
-    assert(errno == EINVAL);
-    errno = 0;
-    assert(!fs_delete(parent_dotdot));
-    assert(errno == EINVAL);
+    for (size_t i = 0; i < sizeof(test_paths) / sizeof(test_paths[0]); i++) {
+        errno = 0;
+        assert(!fs_delete_recursive(test_paths[i]));
+        assert(errno == EINVAL);
+        errno = 0;
+        assert(!fs_delete(test_paths[i]));
+        assert(errno == EINVAL);
+    }
     assert(access(parent, F_OK) == 0);
     assert(access(sentinel, F_OK) == 0);
     teardown();
