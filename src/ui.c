@@ -311,8 +311,7 @@ void ui_handle_input(DualPaneUI *ui, int ch) {
         if (!ui->clipboard.is_cut && ui->clipboard.count == 1) {
             char destination[PATH_MAX];
             const char *source = ui->clipboard.paths[0];
-            const char *name = strrchr(source, '/');
-            name = name ? name + 1 : source;
+            const char *name = path_basename(source);
             if (utils_join_path(destination, sizeof(destination),
                                 active->state.current_path, name) &&
                 task_start_copy(&ui->task, source, destination)) {

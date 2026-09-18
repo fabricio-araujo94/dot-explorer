@@ -66,6 +66,12 @@ static void test_utils_join_path(void) {
     assert(errno == ENAMETOOLONG);
 }
 
+static void test_path_basename(void) {
+    assert(strcmp(path_basename("/tmp/file.txt"), "file.txt") == 0);
+    assert(strcmp(path_basename("C:\\tmp\\file.txt"), "file.txt") == 0);
+    assert(strcmp(path_basename("file.txt"), "file.txt") == 0);
+}
+
 static void test_platform_realpath_and_mkdir(void) {
     char resolved[PATH_MAX];
 
@@ -119,6 +125,7 @@ static void test_theme_and_icons(void) {
 int main(void) {
     test_format_size();
     test_utils_join_path();
+    test_path_basename();
     test_platform_realpath_and_mkdir();
     test_theme_and_icons();
     puts("test_utils: all tests passed");

@@ -77,17 +77,6 @@ static bool set_error_path(char *error_path, size_t error_path_size, const char 
     return true;
 }
 
-static const char *path_basename(const char *path) {
-    const char *separator = strrchr(path, '/');
-#ifdef _WIN32
-    const char *backslash = strrchr(path, '\\');
-    if (backslash && (!separator || backslash > separator)) {
-        separator = backslash;
-    }
-#endif
-    return separator ? separator + 1 : path;
-}
-
 static void history_clear_stack(HistoryEntry **entries, size_t *count,
                                 size_t *capacity) {
     free(*entries);

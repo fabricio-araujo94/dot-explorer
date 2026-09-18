@@ -20,6 +20,16 @@ void format_size(size_t size, char *buf, size_t buf_size) {
     }
 }
 
+const char *path_basename(const char *path) {
+    const char *separator = strrchr(path, '/');
+    const char *backslash = strrchr(path, '\\');
+
+    if (backslash && (!separator || backslash > separator)) {
+        separator = backslash;
+    }
+    return separator ? separator + 1 : path;
+}
+
 bool utils_join_path(char *buffer, size_t size, const char *base, const char *name) {
         const char separator = PLATFORM_PATH_SEPARATOR;
     size_t base_length;
