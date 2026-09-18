@@ -34,6 +34,7 @@ typedef struct {
     bool rollback_on_error;
     bool (*progress)(uint64_t bytes_copied, uint64_t total_bytes, void *context);
     bool (*is_cancelled)(void *context);
+    void (*file_complete)(void *context);
     void *progress_context;
 } FsCopyOptions;
 

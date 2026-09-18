@@ -103,7 +103,7 @@ static void test_copy_into_itself(void) {
     char source[PATH_MAX];
     char nested[PATH_MAX];
     char error_path[PATH_MAX];
-    FsCopyOptions options = { false, true, NULL, NULL, NULL };
+    FsCopyOptions options = { false, true, NULL, NULL, NULL, NULL };
     setup();
     make_path(source, sizeof(source), "source.txt");
     write_file(source, "original");

@@ -98,6 +98,7 @@ static void test_task_copy_file_and_directory(void) {
 
     assert(status == TASK_COMPLETED);
     assert(total > 0);
+    assert(copied == total);
 
     /* Verify files exist in dest_tree */
     char check1[PATH_MAX], check2[PATH_MAX];
@@ -105,6 +106,54 @@ static void test_task_copy_file_and_directory(void) {
     assert(utils_join_path(check2, sizeof(check2), dst_dir, "f2.txt"));
     assert(access(check1, F_OK) == 0);
     assert(access(check2, F_OK) == 0);
+
+    task_cleanup(&task);
+    teardown_task_env();
+}
+
+static void test_task_copy_multifile_progress(void) {
+    Task task;
+    char src_dir[PATH_MAX], dst_dir[PATH_MAX];
+    char f_small[PATH_MAX], f_large[PATH_MAX], f_small2[PATH_MAX], f_empty[PATH_MAX];
+    char large_buf[20000];
+    TaskStatus status = TASK_IDLE;
+    uint64_t copied = 0, total = 0;
+    char error_path[PATH_MAX];
+    int attempts = 0;
+
+    setup_task_env();
+    assert(utils_join_path(src_dir, sizeof(src_dir), TEST_TASK_ROOT, "multi_src"));
+    assert(utils_join_path(dst_dir, sizeof(dst_dir), TEST_TASK_ROOT, "multi_dst"));
+    assert(mkdir(src_dir, 0700) == 0);
+
+    assert(utils_join_path(f_small, sizeof(f_small), src_dir, "small.txt"));
+    assert(utils_join_path(f_large, sizeof(f_large), src_dir, "large.bin"));
+    assert(utils_join_path(f_small2, sizeof(f_small2), src_dir, "small2.txt"));
+    assert(utils_join_path(f_empty, sizeof(f_empty), src_dir, "empty.txt"));
+
+    write_dummy_file(f_small, "small file with 24 bytes");
+    memset(large_buf, 'A', sizeof(large_buf));
+    {
+        FILE *f = fopen(f_large, "wb");
+        assert(f != NULL);
+        assert(fwrite(large_buf, 1, sizeof(large_buf), f) == sizeof(large_buf));
+        assert(fclose(f) == 0);
+    }
+    write_dummy_file(f_small2, "another small file");
+    write_dummy_file(f_empty, "");
+
+    task_init(&task);
+    assert(task_start_copy(&task, src_dir, dst_dir));
+
+    attempts = 0;
+    do {
+        task_snapshot(&task, &status, &copied, &total, error_path, sizeof(error_path));
+        if (status == TASK_RUNNING) usleep(1000);
+    } while (status == TASK_RUNNING && ++attempts < 5000);
+
+    assert(status == TASK_COMPLETED);
+    assert(total == 24 + sizeof(large_buf) + strlen("another small file"));
+    assert(copied == total);
 
     task_cleanup(&task);
     teardown_task_env();
@@ -168,6 +217,7 @@ static void test_task_invalid_inputs(void) {
 int main(void) {
     test_task_init_and_cleanup();
     test_task_copy_file_and_directory();
+    test_task_copy_multifile_progress();
     test_task_cancellation();
     test_task_invalid_inputs();
     puts("test_task: all tests passed");

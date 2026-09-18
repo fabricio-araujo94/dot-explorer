@@ -233,6 +233,9 @@ static bool copy_regular_file(const char *src_path, const char *dest_path,
             success = false;
         }
     }
+    if (success && options && options->file_complete) {
+        options->file_complete(options->progress_context);
+    }
     if (!success) {
         set_error_path(error_path, error_path_size, dest_path);
     }
@@ -497,7 +500,7 @@ bool fs_rename(const char *old_path, const char *new_path) {
 
 
 bool fs_copy_recursive(const char *src_path, const char *dest_path) {
-    FsCopyOptions options = { false, true, NULL, NULL, NULL };
+    FsCopyOptions options = { false, true, NULL, NULL, NULL, NULL };
     char error_path[PATH_MAX];
     return fs_copy_recursive_with_options(src_path, dest_path, &options,
                                           error_path, sizeof(error_path));
@@ -508,7 +511,7 @@ bool fs_copy_recursive_with_options(const char *src_path, const char *dest_path,
                                     char *error_path, size_t error_path_size) {
     struct stat destination_stat;
     bool destination_existed;
-    FsCopyOptions defaults = { false, true, NULL, NULL, NULL };
+    FsCopyOptions defaults = { false, true, NULL, NULL, NULL, NULL };
     const FsCopyOptions *effective_options = options ? options : &defaults;
 
     if (!src_path || !dest_path || !*src_path || !*dest_path ||

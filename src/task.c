@@ -31,14 +31,19 @@ static uint64_t tree_size(const char *path) {
 static bool task_progress(uint64_t copied, uint64_t total, void *context) {
     Task *task = context;
     pthread_mutex_lock(&task->mutex);
-    if (copied < task->current_file_bytes) {
-        task->bytes_copied += task->current_file_bytes;
-    }
     task->current_file_bytes = copied;
     if (total > 0 && task->total_bytes == 0) task->total_bytes = total;
     bool cancelled = task->cancel_requested;
     pthread_mutex_unlock(&task->mutex);
     return !cancelled;
+}
+
+static void task_file_complete(void *context) {
+    Task *task = context;
+    pthread_mutex_lock(&task->mutex);
+    task->bytes_copied += task->current_file_bytes;
+    task->current_file_bytes = 0;
+    pthread_mutex_unlock(&task->mutex);
 }
 
 static bool task_cancelled(void *context) {
@@ -53,7 +58,7 @@ static void *copy_worker(void *context) {
     Task *task = context;
     char error_path[PATH_MAX];
     error_path[0] = '\0';
-    FsCopyOptions options = { false, true, task_progress, task_cancelled, task };
+    FsCopyOptions options = { false, true, task_progress, task_cancelled, task_file_complete, task };
     bool success = fs_copy_recursive_with_options(task->source, task->destination,
                                                   &options, error_path,
                                                   sizeof(error_path));
