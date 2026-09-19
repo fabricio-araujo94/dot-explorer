@@ -143,19 +143,20 @@ static void safe_draw_line(int y, int x, const char *str, int max_cols) {
     mbstate_t ps;
     memset(&ps, 0, sizeof(ps));
     const char *p = str;
+    size_t remaining = strlen(str);
     char chunk[PATH_MAX];
     size_t chunk_len = 0;
 
-    while (*p && cur_col < max_cols) {
+    while (remaining > 0 && cur_col < max_cols) {
         wchar_t wc;
-        size_t n = mbrtowc(&wc, p, strlen(p), &ps);
+        size_t n = mbrtowc(&wc, p, remaining, &ps);
         if (n == (size_t)-1 || n == (size_t)-2 || n == 0) {
             if (cur_col + 1 <= max_cols && chunk_len + 1 < sizeof(chunk)) {
                 chunk[chunk_len++] = *p ? *p : ' ';
                 cur_col += 1;
             }
-            if (*p) p++;
-            else break;
+            p++;
+            remaining--;
             memset(&ps, 0, sizeof(ps));
             continue;
         }
@@ -170,6 +171,7 @@ static void safe_draw_line(int y, int x, const char *str, int max_cols) {
         }
         cur_col += w;
         p += n;
+        remaining -= n;
     }
     chunk[chunk_len] = '\0';
     mvaddstr(y, x, chunk);
