@@ -189,11 +189,49 @@ static void test_clipboard_lifecycle_and_errors(void) {
     teardown_state_env();
 }
 
+static void test_clipboard_cut_partial_failure(void) {
+    Clipboard cb = { 0 };
+    char first[PATH_MAX];
+    char second[PATH_MAX];
+    char destination_dir[PATH_MAX];
+    char moved_path[PATH_MAX];
+    char error_path[PATH_MAX];
+    char *missing_path;
+
+    setup_state_env();
+    assert(utils_join_path(first, sizeof(first), TEST_STATE_ROOT, "first.txt"));
+    assert(utils_join_path(second, sizeof(second), TEST_STATE_ROOT, "second.txt"));
+    assert(utils_join_path(destination_dir, sizeof(destination_dir), TEST_STATE_ROOT, "destination"));
+    assert(utils_join_path(moved_path, sizeof(moved_path), destination_dir, "first.txt"));
+    write_dummy_file(first, "first");
+    write_dummy_file(second, "second");
+    assert(mkdir(destination_dir, 0700) == 0);
+    assert(clipboard_add_entry(&cb, first));
+    assert(clipboard_add_entry(&cb, second));
+    missing_path = strdup("/tmp/dot-explorer-state-test/missing.txt");
+    assert(missing_path != NULL);
+    free(cb.paths[1]);
+    cb.paths[1] = missing_path;
+    cb.is_cut = true;
+
+    assert(!clipboard_apply_operation(&cb, destination_dir,
+                                      error_path, sizeof(error_path)));
+    assert(strcmp(error_path, missing_path) == 0);
+    assert(cb.count == 1);
+    assert(strcmp(cb.paths[0], missing_path) == 0);
+    assert(access(first, F_OK) != 0);
+    assert(access(moved_path, F_OK) == 0);
+
+    clipboard_clear(&cb);
+    teardown_state_env();
+}
+
 int main(void) {
     test_state_init_and_cleanup();
     test_fuzzy_filtering();
     test_navigation_history_stack();
     test_clipboard_lifecycle_and_errors();
+    test_clipboard_cut_partial_failure();
     puts("test_state: all tests passed");
     return 0;
 }

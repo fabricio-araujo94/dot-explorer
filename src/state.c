@@ -263,6 +263,17 @@ void clipboard_clear(Clipboard *clipboard) {
     clipboard->source_dir[0] = '\0';
 }
 
+static void clipboard_remove_entry(Clipboard *clipboard, size_t index) {
+    free(clipboard->paths[index]);
+    for (size_t i = index + 1; i < clipboard->count; ++i) {
+        clipboard->paths[i - 1] = clipboard->paths[i];
+    }
+    clipboard->count--;
+    if (clipboard->count == 0) {
+        clipboard_clear(clipboard);
+    }
+}
+
 bool clipboard_apply_operation(Clipboard *clipboard, const char *destination_dir,
                                char *error_path, size_t error_path_size) {
     if (!clipboard || !destination_dir || !*destination_dir ||
@@ -270,7 +281,7 @@ bool clipboard_apply_operation(Clipboard *clipboard, const char *destination_dir
         errno = EINVAL;
         return false;
     }
-    for (size_t i = 0; i < clipboard->count; ++i) {
+    for (size_t i = 0; i < clipboard->count;) {
         const char *source = clipboard->paths[i];
         const char *name = path_basename(source);
         char destination[PATH_MAX];
@@ -291,19 +302,21 @@ bool clipboard_apply_operation(Clipboard *clipboard, const char *destination_dir
                         set_error_path(error_path, error_path_size, source);
                         return false;
                     }
-                    continue;
+                } else {
+                    errno = rename_errno;
+                    set_error_path(error_path, error_path_size, source);
+                    return false;
                 }
-                errno = rename_errno;
-                set_error_path(error_path, error_path_size, source);
-                return false;
             }
         } else if (!fs_copy_recursive(source, destination)) {
             set_error_path(error_path, error_path_size, source);
             return false;
         }
-    }
-    if (clipboard->is_cut) {
-        clipboard_clear(clipboard);
+        if (clipboard->is_cut) {
+            clipboard_remove_entry(clipboard, i);
+        } else {
+            i++;
+        }
     }
     return true;
 }
