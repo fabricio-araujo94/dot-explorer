@@ -275,8 +275,12 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             if (state->dir_list.count > 0) {
                 const FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 if (entry->is_dir) {
-                    history_push(state, state->current_path, state->selected_index);
-                    if (!state_change_dir(state, entry->name)) {
+                    char previous_path[PATH_MAX];
+                    int previous_selected_index = state->selected_index;
+                    snprintf(previous_path, sizeof(previous_path), "%s", state->current_path);
+                    if (state_change_dir(state, entry->name)) {
+                        history_push(state, previous_path, previous_selected_index);
+                    } else {
                         char message[PATH_MAX + 64];
                         snprintf(message, sizeof(message), "%s: %s", entry->name, strerror(errno));
                         ui_show_message("Navigation failed", message);
