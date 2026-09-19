@@ -58,6 +58,10 @@ static void *copy_worker(void *context) {
     Task *task = context;
     char error_path[PATH_MAX];
     error_path[0] = '\0';
+    uint64_t total_bytes = tree_size(task->source);
+    pthread_mutex_lock(&task->mutex);
+    task->total_bytes = total_bytes;
+    pthread_mutex_unlock(&task->mutex);
     FsCopyOptions options = { false, true, task_progress, task_cancelled, task_file_complete, task };
     bool success = fs_copy_recursive_with_options(task->source, task->destination,
                                                   &options, error_path,
@@ -136,7 +140,7 @@ bool task_start_copy(Task *task, const char *source, const char *destination) {
     pthread_mutex_lock(&task->mutex);
     snprintf(task->source, sizeof(task->source), "%s", source);
     snprintf(task->destination, sizeof(task->destination), "%s", destination);
-    task->total_bytes = tree_size(source);
+    task->total_bytes = 0;
     task->bytes_copied = 0;
     task->current_file_bytes = 0;
     task->error_path[0] = '\0';
