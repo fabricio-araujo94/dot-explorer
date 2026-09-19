@@ -1,4 +1,5 @@
 #include "utils.h"
+#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -28,6 +29,13 @@ const char *path_basename(const char *path) {
         separator = backslash;
     }
     return separator ? separator + 1 : path;
+}
+
+bool is_absolute_path(const char *path) {
+    if (!path || !*path) return false;
+    if (path[0] == '/' || path[0] == '\\') return true;
+    return isalpha((unsigned char)path[0]) && path[1] == ':' &&
+           (path[2] == '/' || path[2] == '\\');
 }
 
 bool utils_join_path(char *buffer, size_t size, const char *base, const char *name) {

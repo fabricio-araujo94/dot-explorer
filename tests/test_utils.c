@@ -72,6 +72,16 @@ static void test_path_basename(void) {
     assert(strcmp(path_basename("file.txt"), "file.txt") == 0);
 }
 
+static void test_is_absolute_path(void) {
+    assert(is_absolute_path("/tmp/file.txt"));
+    assert(is_absolute_path("\\\\server\\share\\file.txt"));
+    assert(is_absolute_path("C:\\tmp\\file.txt"));
+    assert(is_absolute_path("D:/tmp/file.txt"));
+    assert(!is_absolute_path("C:file.txt"));
+    assert(!is_absolute_path("relative/file.txt"));
+    assert(!is_absolute_path(NULL));
+}
+
 static void test_platform_realpath_and_mkdir(void) {
     char resolved[PATH_MAX];
 
@@ -126,6 +136,7 @@ int main(void) {
     test_format_size();
     test_utils_join_path();
     test_path_basename();
+    test_is_absolute_path();
     test_platform_realpath_and_mkdir();
     test_theme_and_icons();
     puts("test_utils: all tests passed");

@@ -361,7 +361,7 @@ bool state_change_dir(AppState *state, const char *new_path) {
         saved_selected_name[sizeof(saved_selected_name) - 1] = '\0';
     }
 
-    if (new_path[0] == '/') {
+    if (is_absolute_path(new_path)) {
         strncpy(target_path, new_path, sizeof(target_path) - 1);
     } else {
         if (!utils_join_path(target_path, sizeof(target_path), state->current_path, new_path)) {
