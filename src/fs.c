@@ -364,11 +364,10 @@ void fs_free_dir_list(DirectoryList *list) {
     list->capacity = 0;
 }
 
-static SortType current_sort_type = SORT_NAME;
-
-static int compare_entries(const void *a, const void *b) {
+static int compare_entries(const void *a, const void *b, void *arg) {
     const FileEntry *entryA = (const FileEntry *)a;
     const FileEntry *entryB = (const FileEntry *)b;
+    SortType sort_type = *(const SortType *)arg;
 
     bool a_is_dotdot = (strcmp(entryA->name, "..") == 0);
     bool b_is_dotdot = (strcmp(entryB->name, "..") == 0);
@@ -379,10 +378,10 @@ static int compare_entries(const void *a, const void *b) {
     if (entryA->is_dir && !entryB->is_dir) return -1;
     if (!entryA->is_dir && entryB->is_dir) return 1;
 
-    if (current_sort_type == SORT_SIZE) {
+    if (sort_type == SORT_SIZE) {
         if (entryA->size > entryB->size) return -1;
         if (entryA->size < entryB->size) return 1;
-    } else if (current_sort_type == SORT_DATE) {
+    } else if (sort_type == SORT_DATE) {
         if (entryA->mtime > entryB->mtime) return -1;
         if (entryA->mtime < entryB->mtime) return 1;
     }
@@ -391,9 +390,8 @@ static int compare_entries(const void *a, const void *b) {
 }
 
 void fs_sort_dir_list(DirectoryList *list, SortType sort_type) {
-    current_sort_type = sort_type;
     if (list->count > 0 && list->entries) {
-        qsort(list->entries, list->count, sizeof(FileEntry), compare_entries);
+        qsort_r(list->entries, list->count, sizeof(FileEntry), compare_entries, &sort_type);
     }
 }
 
