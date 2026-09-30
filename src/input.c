@@ -1,13 +1,54 @@
 #include "input.h"
 #include "config.h"
-#include "ui.h"
 #include "utils.h"
+#include "fs.h"
+
 #include <limits.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
 #include <ctype.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <sys/stat.h>
 
+#ifndef _WIN32
+#include <sys/wait.h>
+#include <wordexp.h>
+#include <unistd.h>
+#else
+#include <io.h>
+#include <windows.h>
+#include <shellapi.h>
+#endif
+
+static inline void cb_show_message(const InputCallbacks *cb, const char *title, const char *msg) {
+    if (cb && cb->show_message) {
+        cb->show_message(title, msg, cb->userdata);
+    }
+}
+
+static inline bool cb_prompt(const InputCallbacks *cb, const char *prompt, char *buf, size_t size) {
+    if (cb && cb->prompt) {
+        return cb->prompt(prompt, buf, size, cb->userdata);
+    }
+    return false;
+}
+
+static inline int cb_get_list_height(const InputCallbacks *cb) {
+    if (cb && cb->get_list_height) {
+        int h = cb->get_list_height(cb->userdata);
+        if (h > 0) return h;
+    }
+    return 24;
+}
+
+static inline bool cb_open_file(const InputCallbacks *cb, const char *path) {
+    if (cb && cb->open_file) {
+        return cb->open_file(path, cb->userdata);
+    }
+    return open_file_with_editor(path);
+}
 
 static bool is_navigation_entry(const FileEntry *entry) {
     return entry && (strcmp(entry->name, ".") == 0 ||
@@ -65,23 +106,29 @@ static void move_visible_selection(AppState *state, int view_index, int list_hei
     }
 }
 
-static void filter_prompt(AppState *state) {
+static void filter_prompt(AppState *state, const InputCallbacks *cb) {
+    if (!cb || !cb->get_char) {
+        return;
+    }
     int length = 0;
     state->filter_active = true;
     state->filter_query[0] = '\0';
     filter_entries(state->filter_query, &state->dir_list, &state->filtered_entries);
-    curs_set(1);
+    if (cb->set_cursor) cb->set_cursor(1, cb->userdata);
+
     for (;;) {
         int ch;
-        ui_render_filter_prompt(state->filter_query);
-        ch = getch();
-        if (ch == 27) {
+        if (cb->render_filter_prompt) {
+            cb->render_filter_prompt(state->filter_query, cb->userdata);
+        }
+        ch = cb->get_char(cb->userdata);
+        if (ch == 27 || ch == -1) { /* 27 = ESC */
             state->filter_active = false;
             state->filter_query[0] = '\0';
             entry_list_clear(&state->filtered_entries);
             break;
         }
-        if (ch == '\n' || ch == KEY_ENTER) break;
+        if (ch == '\n' || ch == 10 || ch == 13 || ch == KEY_ENTER) break;
         if (ch == KEY_BACKSPACE || ch == 127 || ch == '\b') {
             if (length > 0) state->filter_query[--length] = '\0';
         } else if (isprint((unsigned char)ch) &&
@@ -101,20 +148,8 @@ static void filter_prompt(AppState *state) {
         state->filter_active = false;
         entry_list_clear(&state->filtered_entries);
     }
-    curs_set(0);
+    if (cb->set_cursor) cb->set_cursor(0, cb->userdata);
 }
-#include <errno.h>
-#include <stdlib.h>
-#include <sys/stat.h>
-#ifndef _WIN32
-#include <sys/wait.h>
-#include <wordexp.h>
-#include <unistd.h>
-#else
-#include <io.h>
-#include <windows.h>
-#include <shellapi.h>
-#endif
 
 bool open_file_with_editor(const char *path) {
     struct stat file_stat;
@@ -131,9 +166,6 @@ bool open_file_with_editor(const char *path) {
     if (access(path, R_OK) != 0) {
         return false;
     }
-
-    def_prog_mode();
-    endwin();
 
 #ifdef _WIN32
     {
@@ -202,10 +234,6 @@ bool open_file_with_editor(const char *path) {
     }
 #endif
 
-    reset_prog_mode();
-    keypad(stdscr, TRUE);
-    clear();
-    refresh();
     if (!success) {
         errno = saved_errno ? saved_errno : EIO;
     }
@@ -245,11 +273,8 @@ static bool capture_clipboard(AppState *state, Clipboard *clipboard, bool is_cut
     return clipboard->count > 0;
 }
 
-void input_handle(AppState *state, Clipboard *clipboard, int ch) {
-    int max_y, max_x;
-    getmaxyx(stdscr, max_y, max_x);
-    (void)max_x;
-    int list_height = max_y - 1;
+void input_handle(AppState *state, Clipboard *clipboard, int ch, const InputCallbacks *callbacks) {
+    int list_height = cb_get_list_height(callbacks);
 
     switch (ch) {
         case DOT_KEY_QUIT:
@@ -267,7 +292,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             break;
 
         case '/':
-            filter_prompt(state);
+            filter_prompt(state, callbacks);
             break;
 
         case DOT_KEY_ENTER_DIR:
@@ -283,15 +308,15 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
                     } else {
                         char message[PATH_MAX + 64];
                         snprintf(message, sizeof(message), "%s: %s", entry->name, strerror(errno));
-                        ui_show_message("Navigation failed", message);
+                        cb_show_message(callbacks, "Navigation failed", message);
                     }
                 } else {
                     char path[PATH_MAX];
                     if (utils_join_path(path, sizeof(path), state->current_path, entry->name) &&
-                        !open_file_with_editor(path)) {
+                        !cb_open_file(callbacks, path)) {
                         char message[PATH_MAX + 64];
                         snprintf(message, sizeof(message), "%s: %s", path, strerror(errno));
-                        ui_show_message("Open failed", message);
+                        cb_show_message(callbacks, "Open failed", message);
                     }
                 }
             }
@@ -303,7 +328,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             if (!state_change_dir(state, "..")) {
                 char message[PATH_MAX + 64];
                 snprintf(message, sizeof(message), "..: %s", strerror(errno));
-                ui_show_message("Navigation failed", message);
+                cb_show_message(callbacks, "Navigation failed", message);
             }
             break;
 
@@ -321,7 +346,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             if (!state_change_dir(state, ".")) {
                 char message[PATH_MAX + 64];
                 snprintf(message, sizeof(message), "%s", strerror(errno));
-                ui_show_message("Refresh failed", message);
+                cb_show_message(callbacks, "Refresh failed", message);
             }
             break;
 
@@ -355,7 +380,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
                     snprintf(prompt_msg, sizeof(prompt_msg),
                              "Delete %d selected item%s? (y/n): ",
                              selected_count, selected_count > 1 ? "s" : "");
-                    if (ui_prompt(prompt_msg, buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
+                    if (cb_prompt(callbacks, prompt_msg, buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
                         bool any_fail = false;
                         char fail_msg[PATH_MAX + 64] = "";
                         for (int i = 0; i < state->dir_list.count; ++i) {
@@ -370,23 +395,23 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
                             }
                         }
                         if (any_fail) {
-                            ui_show_message("Delete failed", fail_msg);
+                            cb_show_message(callbacks, "Delete failed", fail_msg);
                         }
                         state_change_dir(state, ".");
                     }
                 } else {
                     FileEntry *entry = &state->dir_list.entries[state->selected_index];
                     if (is_navigation_entry(entry)) {
-                        ui_show_message("Delete blocked", "Navigation entries cannot be deleted.");
+                        cb_show_message(callbacks, "Delete blocked", "Navigation entries cannot be deleted.");
                         break;
                     }
-                    if (ui_prompt("Delete item? (y/n): ", buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
+                    if (cb_prompt(callbacks, "Delete item? (y/n): ", buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
                         char full_path[PATH_MAX];
                         utils_join_path(full_path, sizeof(full_path), state->current_path, entry->name);
                         if (!fs_delete(full_path)) {
                             char msg[PATH_MAX + 64];
                             snprintf(msg, sizeof(msg), "%s: %s", entry->name, strerror(errno));
-                            ui_show_message("Delete failed", msg);
+                            cb_show_message(callbacks, "Delete failed", msg);
                         }
                         state_change_dir(state, ".");
                     }
@@ -399,17 +424,17 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
                 FileEntry *entry = &state->dir_list.entries[state->selected_index];
                 char new_name[256];
                 if (is_navigation_entry(entry)) {
-                    ui_show_message("Rename blocked", "Navigation entries cannot be renamed.");
+                    cb_show_message(callbacks, "Rename blocked", "Navigation entries cannot be renamed.");
                     break;
                 }
-                if (ui_prompt("New name: ", new_name, sizeof(new_name))) {
+                if (cb_prompt(callbacks, "New name: ", new_name, sizeof(new_name))) {
                     char old_path[PATH_MAX], new_path[PATH_MAX];
                     utils_join_path(old_path, sizeof(old_path), state->current_path, entry->name);
                     utils_join_path(new_path, sizeof(new_path), state->current_path, new_name);
                     if (!fs_rename(old_path, new_path)) {
                         char msg[PATH_MAX + 64];
                         snprintf(msg, sizeof(msg), "%s: %s", new_name, strerror(errno));
-                        ui_show_message("Rename failed", msg);
+                        cb_show_message(callbacks, "Rename failed", msg);
                     }
                     state_change_dir(state, ".");
                 }
@@ -419,13 +444,13 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
         case DOT_KEY_CREATE_FILE:
             {
                 char name[256];
-                if (ui_prompt("New file name: ", name, sizeof(name))) {
+                if (cb_prompt(callbacks, "New file name: ", name, sizeof(name))) {
                     char full_path[PATH_MAX];
                     utils_join_path(full_path, sizeof(full_path), state->current_path, name);
                     if (!fs_create_file(full_path)) {
                         char msg[PATH_MAX + 64];
                         snprintf(msg, sizeof(msg), "%s: %s", name, strerror(errno));
-                        ui_show_message("Create file failed", msg);
+                        cb_show_message(callbacks, "Create file failed", msg);
                     }
                     state_change_dir(state, ".");
                 }
@@ -435,13 +460,13 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
         case DOT_KEY_CREATE_DIR:
             {
                 char name[256];
-                if (ui_prompt("New directory name: ", name, sizeof(name))) {
+                if (cb_prompt(callbacks, "New directory name: ", name, sizeof(name))) {
                     char full_path[PATH_MAX];
                     utils_join_path(full_path, sizeof(full_path), state->current_path, name);
                     if (!fs_create_dir(full_path)) {
                         char msg[PATH_MAX + 64];
                         snprintf(msg, sizeof(msg), "%s: %s", name, strerror(errno));
-                        ui_show_message("Create directory failed", msg);
+                        cb_show_message(callbacks, "Create directory failed", msg);
                     }
                     state_change_dir(state, ".");
                 }
@@ -467,7 +492,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             if (state->dir_list.count > 0) {
                 if (!capture_clipboard(state, clipboard, false) &&
                     is_navigation_entry(&state->dir_list.entries[state->selected_index])) {
-                    ui_show_message("Copy blocked", "Navigation entries cannot be copied.");
+                    cb_show_message(callbacks, "Copy blocked", "Navigation entries cannot be copied.");
                 }
             }
             break;
@@ -476,7 +501,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
             if (state->dir_list.count > 0) {
                 if (!capture_clipboard(state, clipboard, true) &&
                     is_navigation_entry(&state->dir_list.entries[state->selected_index])) {
-                    ui_show_message("Cut blocked", "Navigation entries cannot be cut.");
+                    cb_show_message(callbacks, "Cut blocked", "Navigation entries cannot be cut.");
                 }
             }
             break;
@@ -486,7 +511,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
                 char error_path[PATH_MAX];
                 if (!clipboard_apply_operation(clipboard, state->current_path,
                                                error_path, sizeof(error_path))) {
-                    ui_show_message("Paste failed", error_path);
+                    cb_show_message(callbacks, "Paste failed", error_path);
                 }
                 state_change_dir(state, ".");
             }
@@ -517,7 +542,7 @@ void input_handle(AppState *state, Clipboard *clipboard, int ch) {
                          entry->is_dir ? "-" : size_str,
                          date_str);
                 
-                ui_show_message("Properties", msg);
+                cb_show_message(callbacks, "Properties", msg);
             }
             break;
 

@@ -6,6 +6,7 @@
 #include <limits.h>
 #include <string.h>
 #include <stdio.h>
+#include <wchar.h>
 
 void ui_init(void) {
     initscr();
@@ -134,8 +135,6 @@ static const char *file_extension(const char *name) {
     const char *dot = strrchr(name, '.');
     return dot ? dot : "";
 }
-
-#include <wchar.h>
 
 static void safe_draw_line(int y, int x, const char *str, int max_cols) {
     if (max_cols <= 0) return;
@@ -297,6 +296,62 @@ void ui_draw(DualPaneUI *ui) {
     refresh();
 }
 
+static bool ui_input_prompt(const char *prompt, char *buffer, size_t buf_size, void *userdata) {
+    (void)userdata;
+    return ui_prompt(prompt, buffer, buf_size);
+}
+
+static void ui_input_show_message(const char *title, const char *message, void *userdata) {
+    (void)userdata;
+    ui_show_message(title, message);
+}
+
+static int ui_input_get_list_height(void *userdata) {
+    (void)userdata;
+    int max_y, max_x;
+    getmaxyx(stdscr, max_y, max_x);
+    (void)max_x;
+    return max_y - 1;
+}
+
+static bool ui_input_open_file(const char *path, void *userdata) {
+    (void)userdata;
+    def_prog_mode();
+    endwin();
+    bool result = open_file_with_editor(path);
+    reset_prog_mode();
+    keypad(stdscr, TRUE);
+    clear();
+    refresh();
+    return result;
+}
+
+static void ui_input_render_filter(const char *query, void *userdata) {
+    (void)userdata;
+    ui_render_filter_prompt(query);
+}
+
+static int ui_input_get_char(void *userdata) {
+    (void)userdata;
+    return getch();
+}
+
+static void ui_input_set_cursor(int visibility, void *userdata) {
+    (void)userdata;
+    curs_set(visibility);
+}
+
+static const InputCallbacks ui_input_callbacks = {
+    .prompt = ui_input_prompt,
+    .show_message = ui_input_show_message,
+    .get_list_height = ui_input_get_list_height,
+    .open_file = ui_input_open_file,
+    .render_filter_prompt = ui_input_render_filter,
+    .get_char = ui_input_get_char,
+    .set_cursor = ui_input_set_cursor,
+    .userdata = NULL,
+};
+
 void ui_handle_input(DualPaneUI *ui, int ch) {
     Pane *active = &ui->panes[ui->active_pane_index];
 
@@ -333,7 +388,7 @@ void ui_handle_input(DualPaneUI *ui, int ch) {
         return;
     }
     if (ch != DOT_KEY_PASTE) {
-        input_handle(&active->state, &ui->clipboard, ch);
+        input_handle(&active->state, &ui->clipboard, ch, &ui_input_callbacks);
     }
     pane_sync(active);
 }
