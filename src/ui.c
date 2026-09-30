@@ -239,6 +239,50 @@ void ui_dual_cleanup(DualPaneUI *ui) {
     state_cleanup(&ui->panes[1].state);
 }
 
+static void draw_task_status_bar(const DualPaneUI *ui, int max_y, int max_x) {
+    TaskStatus status;
+    uint64_t copied, total;
+    char error_path[PATH_MAX];
+    task_snapshot((Task *)&ui->task, &status, &copied, &total,
+                  error_path, sizeof(error_path));
+    if (status == TASK_RUNNING) {
+        int width = max_x > 4 ? max_x - 4 : 1;
+        int filled = total > 0 ? (int)((copied * (uint64_t)width) / total) : 0;
+        if (filled > width) filled = width;
+        mvprintw(max_y - 1, 1, "Copy [");
+        mvhline(max_y - 1, 7, '#', filled);
+        mvhline(max_y - 1, 7 + filled, '-', width - filled);
+        mvprintw(max_y - 1, 8 + width, "] Esc cancel");
+    } else if (status == TASK_FAILED) {
+        mvprintw(max_y - 1, 1, "Copy failed: %.*s", max_x - 3, error_path);
+    } else if (status == TASK_CANCELLED) {
+        mvprintw(max_y - 1, 1, "Copy cancelled");
+    }
+}
+
+void ui_update(DualPaneUI *ui) {
+    TaskStatus status;
+    uint64_t copied, total;
+    char error_path[PATH_MAX];
+    task_snapshot(&ui->task, &status, &copied, &total,
+                  error_path, sizeof(error_path));
+
+    if (status == TASK_COMPLETED && ui->task_refresh_pending) {
+        if (ui->task_destination_pane >= 0 && ui->task_destination_pane < 2) {
+            Pane *destination = &ui->panes[ui->task_destination_pane];
+            state_change_dir(&destination->state, ".");
+            pane_sync(destination);
+        }
+        ui->task_refresh_pending = false;
+    } else if ((status == TASK_FAILED || status == TASK_CANCELLED) &&
+               ui->task_refresh_pending) {
+        ui->task_refresh_pending = false;
+    }
+    if (status != TASK_RUNNING && status != TASK_IDLE) {
+        task_reap(&ui->task);
+    }
+}
+
 void ui_draw(DualPaneUI *ui) {
     int max_y, max_x;
     int left_width;
@@ -259,40 +303,7 @@ void ui_draw(DualPaneUI *ui) {
     erase();
     draw_pane(&ui->panes[0], ui->active_pane_index == 0);
     draw_pane(&ui->panes[1], ui->active_pane_index == 1);
-    {
-        TaskStatus status;
-        uint64_t copied, total;
-        char error_path[PATH_MAX];
-        task_snapshot(&ui->task, &status, &copied, &total,
-                      error_path, sizeof(error_path));
-        if (status == TASK_RUNNING) {
-            int width = max_x > 4 ? max_x - 4 : 1;
-            int filled = total > 0 ? (int)((copied * (uint64_t)width) / total) : 0;
-            if (filled > width) filled = width;
-            mvprintw(max_y - 1, 1, "Copy [");
-            mvhline(max_y - 1, 7, '#', filled);
-            mvhline(max_y - 1, 7 + filled, '-', width - filled);
-            mvprintw(max_y - 1, 8 + width, "] Esc cancel");
-        } else if (status == TASK_FAILED) {
-            mvprintw(max_y - 1, 1, "Copy failed: %.*s", max_x - 3, error_path);
-        } else if (status == TASK_CANCELLED) {
-            mvprintw(max_y - 1, 1, "Copy cancelled");
-        }
-        if (status == TASK_COMPLETED && ui->task_refresh_pending) {
-            if (ui->task_destination_pane >= 0 && ui->task_destination_pane < 2) {
-                Pane *destination = &ui->panes[ui->task_destination_pane];
-                state_change_dir(&destination->state, ".");
-                pane_sync(destination);
-            }
-            ui->task_refresh_pending = false;
-        } else if ((status == TASK_FAILED || status == TASK_CANCELLED) &&
-                   ui->task_refresh_pending) {
-            ui->task_refresh_pending = false;
-        }
-        if (status != TASK_RUNNING && status != TASK_IDLE) {
-            task_reap(&ui->task);
-        }
-    }
+    draw_task_status_bar(ui, max_y, max_x);
     refresh();
 }
 

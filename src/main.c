@@ -13,10 +13,13 @@ int main(void) {
     timeout(100);
 
     while (!dual_pane.panes[dual_pane.active_pane_index].state.should_quit) {
+        ui_update(&dual_pane);
         ui_draw(&dual_pane);
         
         int ch = getch();
-        ui_handle_input(&dual_pane, ch);
+        if (ch != ERR) {
+            ui_handle_input(&dual_pane, ch);
+        }
     }
 
     ui_dual_cleanup(&dual_pane);
