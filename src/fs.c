@@ -364,11 +364,7 @@ void fs_free_dir_list(DirectoryList *list) {
     list->capacity = 0;
 }
 
-static int compare_entries(const void *a, const void *b, void *arg) {
-    const FileEntry *entryA = (const FileEntry *)a;
-    const FileEntry *entryB = (const FileEntry *)b;
-    SortType sort_type = *(const SortType *)arg;
-
+static int compare_entries_common(const FileEntry *entryA, const FileEntry *entryB) {
     bool a_is_dotdot = (strcmp(entryA->name, "..") == 0);
     bool b_is_dotdot = (strcmp(entryB->name, "..") == 0);
     if (a_is_dotdot && b_is_dotdot) return 0;
@@ -378,21 +374,48 @@ static int compare_entries(const void *a, const void *b, void *arg) {
     if (entryA->is_dir && !entryB->is_dir) return -1;
     if (!entryA->is_dir && entryB->is_dir) return 1;
 
-    if (sort_type == SORT_SIZE) {
-        if (entryA->size > entryB->size) return -1;
-        if (entryA->size < entryB->size) return 1;
-    } else if (sort_type == SORT_DATE) {
-        if (entryA->mtime > entryB->mtime) return -1;
-        if (entryA->mtime < entryB->mtime) return 1;
-    }
+    return 0;
+}
 
+static int compare_by_name(const void *a, const void *b) {
+    const FileEntry *entryA = (const FileEntry *)a;
+    const FileEntry *entryB = (const FileEntry *)b;
+    int common = compare_entries_common(entryA, entryB);
+    if (common != 0) return common;
+    return strcasecmp(entryA->name, entryB->name);
+}
+
+static int compare_by_size(const void *a, const void *b) {
+    const FileEntry *entryA = (const FileEntry *)a;
+    const FileEntry *entryB = (const FileEntry *)b;
+    int common = compare_entries_common(entryA, entryB);
+    if (common != 0) return common;
+    if (entryA->size > entryB->size) return -1;
+    if (entryA->size < entryB->size) return 1;
+    return strcasecmp(entryA->name, entryB->name);
+}
+
+static int compare_by_date(const void *a, const void *b) {
+    const FileEntry *entryA = (const FileEntry *)a;
+    const FileEntry *entryB = (const FileEntry *)b;
+    int common = compare_entries_common(entryA, entryB);
+    if (common != 0) return common;
+    if (entryA->mtime > entryB->mtime) return -1;
+    if (entryA->mtime < entryB->mtime) return 1;
     return strcasecmp(entryA->name, entryB->name);
 }
 
 void fs_sort_dir_list(DirectoryList *list, SortType sort_type) {
-    if (list->count > 0 && list->entries) {
-        qsort_r(list->entries, list->count, sizeof(FileEntry), compare_entries, &sort_type);
+    if (!list || list->count <= 1 || !list->entries) {
+        return;
     }
+    int (*comparator)(const void *, const void *) = compare_by_name;
+    if (sort_type == SORT_SIZE) {
+        comparator = compare_by_size;
+    } else if (sort_type == SORT_DATE) {
+        comparator = compare_by_date;
+    }
+    qsort(list->entries, list->count, sizeof(FileEntry), comparator);
 }
 
 bool fs_read_dir(const char *path, DirectoryList *list) {
