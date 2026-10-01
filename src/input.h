@@ -2,6 +2,7 @@
 #define INPUT_H
 
 #include "state.h"
+#include "process.h"
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -36,6 +37,5 @@ typedef struct InputCallbacks {
 } InputCallbacks;
 
 void input_handle(AppState *state, Clipboard *clipboard, int ch, const InputCallbacks *callbacks);
-bool open_file_with_editor(const char *path);
 
 #endif // INPUT_H

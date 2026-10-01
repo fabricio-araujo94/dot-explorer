@@ -2,6 +2,7 @@
 #include "config.h"
 #include "utils.h"
 #include "fs.h"
+#include "process.h"
 
 #include <limits.h>
 #include <string.h>
@@ -11,16 +12,6 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <sys/stat.h>
-
-#ifndef _WIN32
-#include <sys/wait.h>
-#include <wordexp.h>
-#include <unistd.h>
-#else
-#include <io.h>
-#include <windows.h>
-#include <shellapi.h>
-#endif
 
 static inline void cb_show_message(const InputCallbacks *cb, const char *title, const char *msg) {
     if (cb && cb->show_message) {
@@ -149,95 +140,6 @@ static void filter_prompt(AppState *state, const InputCallbacks *cb) {
         entry_list_clear(&state->filtered_entries);
     }
     if (cb->set_cursor) cb->set_cursor(0, cb->userdata);
-}
-
-bool open_file_with_editor(const char *path) {
-    struct stat file_stat;
-    bool success = false;
-    int saved_errno = 0;
-
-    if (!path || stat(path, &file_stat) != 0) {
-        return false;
-    }
-    if (!S_ISREG(file_stat.st_mode)) {
-        errno = EISDIR;
-        return false;
-    }
-    if (access(path, R_OK) != 0) {
-        return false;
-    }
-
-#ifdef _WIN32
-    {
-        HINSTANCE result = ShellExecuteA(NULL, "open", path, NULL, NULL, SW_SHOWNORMAL);
-        success = (INT_PTR)result > 32;
-        if (!success) {
-            errno = EIO;
-        }
-    }
-#else
-    {
-        const char *editor = getenv("EDITOR");
-        wordexp_t words;
-        char **editor_argv = NULL;
-        size_t editor_argc = 0;
-        pid_t child;
-        int status;
-
-        memset(&words, 0, sizeof(words));
-        if (editor && *editor && wordexp(editor, &words, WRDE_NOCMD) == 0 &&
-            words.we_wordc > 0) {
-            editor_argc = words.we_wordc;
-            editor_argv = calloc(editor_argc + 2, sizeof(*editor_argv));
-            if (editor_argv) {
-                for (size_t i = 0; i < editor_argc; ++i) {
-                    editor_argv[i] = words.we_wordv[i];
-                }
-                editor_argv[editor_argc] = (char *)path;
-            }
-        }
-
-        child = fork();
-        if (child == 0) {
-            if (editor_argv) {
-                execvp(editor_argv[0], editor_argv);
-            }
-            {
-                char *fallback[] = { (char *)"nano", (char *)path, NULL };
-                execvp(fallback[0], fallback);
-            }
-            {
-                char *fallback[] = { (char *)"vi", (char *)path, NULL };
-                execvp(fallback[0], fallback);
-            }
-            _exit(127);
-        }
-        if (child < 0) {
-            saved_errno = errno;
-        } else {
-            do {
-                success = waitpid(child, &status, 0) >= 0;
-            } while (!success && errno == EINTR);
-            if (success) {
-                success = WIFEXITED(status) && WEXITSTATUS(status) == 0;
-                if (!success) {
-                    saved_errno = WIFEXITED(status) ? EIO : EINTR;
-                }
-            } else {
-                saved_errno = errno;
-            }
-        }
-        free(editor_argv);
-        if (editor && *editor && words.we_wordc > 0) {
-            wordfree(&words);
-        }
-    }
-#endif
-
-    if (!success) {
-        errno = saved_errno ? saved_errno : EIO;
-    }
-    return success;
 }
 
 static bool capture_clipboard(AppState *state, Clipboard *clipboard, bool is_cut) {

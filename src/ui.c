@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "input.h"
+#include "process.h"
 #include "config.h"
 #include "utils.h"
 #include "utils/theme.h"
