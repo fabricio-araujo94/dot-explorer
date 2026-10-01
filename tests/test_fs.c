@@ -2,6 +2,7 @@
 #include "state.h"
 #include "task.h"
 #include "utils.h"
+#include "test_helpers.h"
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
@@ -11,11 +12,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define TEST_ROOT "/tmp/dot-explorer-test"
+static char TEST_ROOT[PATH_MAX];
 
 static void setup(void) {
+    assert(test_get_temp_dir(TEST_ROOT, sizeof(TEST_ROOT), "dot-explorer-test"));
     fs_delete_recursive(TEST_ROOT);
-    assert(mkdir(TEST_ROOT, 0700) == 0);
+    assert(platform_mkdir(TEST_ROOT, 0700) == 0);
 }
 
 static void teardown(void) {
@@ -39,7 +41,7 @@ static void test_delete_circular_symlinks(void) {
     char second[PATH_MAX];
     setup();
     make_path(tree, sizeof(tree), "tree");
-    assert(mkdir(tree, 0700) == 0);
+    assert(platform_mkdir(tree, 0700) == 0);
     make_path(first, sizeof(first), "tree/first");
     make_path(second, sizeof(second), "tree/second");
 #ifdef _WIN32
@@ -68,9 +70,9 @@ static void test_delete_parent_path_is_blocked(void) {
 
     setup();
     make_path(parent, sizeof(parent), "parent");
-    assert(mkdir(parent, 0700) == 0);
+    assert(platform_mkdir(parent, 0700) == 0);
     make_path(child, sizeof(child), "parent/child");
-    assert(mkdir(child, 0700) == 0);
+    assert(platform_mkdir(child, 0700) == 0);
     make_path(sentinel, sizeof(sentinel), "parent/important.txt");
     write_file(sentinel, "keep");
     size_t parent_len = strlen(parent);
@@ -110,7 +112,7 @@ static void test_copy_into_itself(void) {
     assert(!fs_copy_recursive_with_options(source, source, &options,
                                            error_path, sizeof(error_path)));
     make_path(nested, sizeof(nested), "folder");
-    assert(mkdir(nested, 0700) == 0);
+    assert(platform_mkdir(nested, 0700) == 0);
     assert(!fs_copy_recursive_with_options(TEST_ROOT, nested, &options,
                                            error_path, sizeof(error_path)));
     assert(access(nested, F_OK) == 0);
@@ -129,8 +131,8 @@ static void test_clipboard_apply_between_directories(void) {
     setup();
     make_path(source_dir, sizeof(source_dir), "source");
     make_path(destination_dir, sizeof(destination_dir), "destination");
-    assert(mkdir(source_dir, 0700) == 0);
-    assert(mkdir(destination_dir, 0700) == 0);
+    assert(platform_mkdir(source_dir, 0700) == 0);
+    assert(platform_mkdir(destination_dir, 0700) == 0);
     assert(utils_join_path(source_file, sizeof(source_file), source_dir, "item.txt"));
     write_file(source_file, "clipboard");
     assert(clipboard_add_entry(&clipboard, source_file));
@@ -157,8 +159,8 @@ static void test_clipboard_cut_same_filesystem(void) {
     setup();
     make_path(source_dir, sizeof(source_dir), "cut-source");
     make_path(destination_dir, sizeof(destination_dir), "cut-destination");
-    assert(mkdir(source_dir, 0700) == 0);
-    assert(mkdir(destination_dir, 0700) == 0);
+    assert(platform_mkdir(source_dir, 0700) == 0);
+    assert(platform_mkdir(destination_dir, 0700) == 0);
     assert(utils_join_path(source_file, sizeof(source_file), source_dir, "item.txt"));
     write_file(source_file, "move");
     assert(clipboard_add_entry(&clipboard, source_file));
@@ -173,12 +175,16 @@ static void test_clipboard_cut_same_filesystem(void) {
 }
 
 static void test_permission_denied(void) {
-#ifdef _WIN32
-    return;
-#else
     char source[PATH_MAX];
     char destination[PATH_MAX];
     setup();
+#ifdef _WIN32
+    make_path(source, sizeof(source), "source.txt");
+    make_path(destination, sizeof(destination), "missing-parent/copy.txt");
+    write_file(source, "data");
+    assert(!fs_copy_recursive(source, destination));
+    assert(!fs_delete_recursive(destination));
+#else
     if (geteuid() == 0) {
         teardown();
         return;
@@ -190,8 +196,8 @@ static void test_permission_denied(void) {
     assert(!fs_copy_recursive(source, destination));
     assert(!fs_delete_recursive(source));
     assert(chmod(TEST_ROOT, 0700) == 0);
-    assert(fs_delete_recursive(TEST_ROOT));
 #endif
+    teardown();
 }
 
 static void test_path_near_path_max(void) {
@@ -218,7 +224,6 @@ static void test_async_task_lifecycle(void) {
     uint64_t copied = 0;
     uint64_t total = 0;
     char error_path[PATH_MAX];
-    int attempts = 0;
 
     setup();
     make_path(source, sizeof(source), "async-source.txt");
@@ -226,11 +231,8 @@ static void test_async_task_lifecycle(void) {
     write_file(source, "background copy");
     task_init(&task);
     assert(task_start_copy(&task, source, destination));
-    do {
-        task_snapshot(&task, &status, &copied, &total,
-                      error_path, sizeof(error_path));
-        if (status == TASK_RUNNING) usleep(1000);
-    } while (status == TASK_RUNNING && ++attempts < 10000);
+    task_reap(&task);
+    task_snapshot(&task, &status, &copied, &total, error_path, sizeof(error_path));
     assert(status == TASK_COMPLETED);
     assert(total > 0);
     assert(copied == total);
@@ -240,23 +242,39 @@ static void test_async_task_lifecycle(void) {
 }
 
 static void test_copy_readonly_directory(void) {
-#ifdef _WIN32
-    return;
-#else
     char src_dir[PATH_MAX];
     char src_file[PATH_MAX];
     char dst_dir[PATH_MAX];
     char dst_file[PATH_MAX];
+#ifndef _WIN32
     struct stat st;
+#endif
 
     setup();
+#ifdef _WIN32
+    DWORD destination_attributes;
+    make_path(src_dir, sizeof(src_dir), "readonly_dir");
+    make_path(dst_dir, sizeof(dst_dir), "readonly_copy");
+    assert(platform_mkdir(src_dir, 0700) == 0);
+    assert(utils_join_path(src_file, sizeof(src_file), src_dir, "data.txt"));
+    write_file(src_file, "read-only file copy test data");
+    assert(SetFileAttributesA(src_file, FILE_ATTRIBUTE_READONLY));
+    assert(fs_copy_recursive(src_dir, dst_dir));
+    assert(utils_join_path(dst_file, sizeof(dst_file), dst_dir, "data.txt"));
+    assert(access(dst_file, F_OK) == 0);
+    destination_attributes = GetFileAttributesA(dst_file);
+    assert(destination_attributes != INVALID_FILE_ATTRIBUTES);
+    assert(destination_attributes & FILE_ATTRIBUTE_READONLY);
+    assert(SetFileAttributesA(src_file, FILE_ATTRIBUTE_NORMAL));
+    assert(SetFileAttributesA(dst_file, FILE_ATTRIBUTE_NORMAL));
+#else
     if (geteuid() == 0) {
         teardown();
         return;
     }
     make_path(src_dir, sizeof(src_dir), "readonly_dir");
     make_path(dst_dir, sizeof(dst_dir), "readonly_copy");
-    assert(mkdir(src_dir, 0700) == 0);
+    assert(platform_mkdir(src_dir, 0700) == 0);
     assert(utils_join_path(src_file, sizeof(src_file), src_dir, "data.txt"));
     write_file(src_file, "read-only directory test data");
 
@@ -277,8 +295,8 @@ static void test_copy_readonly_directory(void) {
     /* Restore write permissions before teardown cleanup */
     assert(chmod(src_dir, 0700) == 0);
     assert(chmod(dst_dir, 0700) == 0);
-    teardown();
 #endif
+    teardown();
 }
 
 static void test_sort_dotdot_stays_first(void) {
@@ -381,7 +399,7 @@ static void test_large_dir_expansion(void) {
 
     setup();
     make_path(dir, sizeof(dir), "large_dir");
-    assert(mkdir(dir, 0700) == 0);
+    assert(platform_mkdir(dir, 0700) == 0);
 
     /* Create 300 files to force multiple reallocs from base capacity 128 */
     for (int i = 0; i < 300; ++i) {
@@ -408,19 +426,26 @@ static void test_large_dir_expansion(void) {
 }
 
 static void test_state_change_dir_permission_denied(void) {
-#ifdef _WIN32
-    return;
-#else
     AppState state;
     char unreadable_dir[PATH_MAX];
 
     setup();
+#ifdef _WIN32
+    make_path(unreadable_dir, sizeof(unreadable_dir), "missing-directory");
+    state_init(&state);
+    assert(state_change_dir(&state, TEST_ROOT));
+    errno = 0;
+    assert(!state_change_dir(&state, unreadable_dir));
+    assert(errno == ENOENT);
+    assert(strcmp(state.current_path, TEST_ROOT) == 0);
+    state_cleanup(&state);
+#else
     if (geteuid() == 0) {
         teardown();
         return;
     }
     make_path(unreadable_dir, sizeof(unreadable_dir), "unreadable");
-    assert(mkdir(unreadable_dir, 0000) == 0);
+    assert(platform_mkdir(unreadable_dir, 0000) == 0);
 
     state_init(&state);
     state_change_dir(&state, TEST_ROOT);
@@ -435,8 +460,8 @@ static void test_state_change_dir_permission_denied(void) {
 
     assert(chmod(unreadable_dir, 0700) == 0);
     state_cleanup(&state);
-    teardown();
 #endif
+    teardown();
 }
 
 int main(void) {

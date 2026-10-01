@@ -1,6 +1,7 @@
 #include "state.h"
 #include "fs.h"
 #include "utils.h"
+#include "test_helpers.h"
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
@@ -10,11 +11,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define TEST_STATE_ROOT "/tmp/dot-explorer-state-test"
+static char TEST_STATE_ROOT[PATH_MAX];
 
 static void setup_state_env(void) {
+    assert(test_get_temp_dir(TEST_STATE_ROOT, sizeof(TEST_STATE_ROOT),
+                             "dot-explorer-state-test"));
     fs_delete_recursive(TEST_STATE_ROOT);
-    assert(mkdir(TEST_STATE_ROOT, 0700) == 0);
+    assert(platform_mkdir(TEST_STATE_ROOT, 0700) == 0);
 }
 
 static void teardown_state_env(void) {
@@ -196,7 +199,7 @@ static void test_clipboard_cut_partial_failure(void) {
     char destination_dir[PATH_MAX];
     char moved_path[PATH_MAX];
     char error_path[PATH_MAX];
-    char *missing_path;
+    char missing_path[PATH_MAX];
 
     setup_state_env();
     assert(utils_join_path(first, sizeof(first), TEST_STATE_ROOT, "first.txt"));
@@ -205,13 +208,14 @@ static void test_clipboard_cut_partial_failure(void) {
     assert(utils_join_path(moved_path, sizeof(moved_path), destination_dir, "first.txt"));
     write_dummy_file(first, "first");
     write_dummy_file(second, "second");
-    assert(mkdir(destination_dir, 0700) == 0);
+    assert(platform_mkdir(destination_dir, 0700) == 0);
     assert(clipboard_add_entry(&cb, first));
     assert(clipboard_add_entry(&cb, second));
-    missing_path = strdup("/tmp/dot-explorer-state-test/missing.txt");
-    assert(missing_path != NULL);
+    assert(utils_join_path(missing_path, sizeof(missing_path), TEST_STATE_ROOT,
+                           "missing.txt"));
     free(cb.paths[1]);
-    cb.paths[1] = missing_path;
+    cb.paths[1] = strdup(missing_path);
+    assert(cb.paths[1] != NULL);
     cb.is_cut = true;
 
     assert(!clipboard_apply_operation(&cb, destination_dir,

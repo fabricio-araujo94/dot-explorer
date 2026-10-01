@@ -1,6 +1,7 @@
 #include "task.h"
 #include "fs.h"
 #include "utils.h"
+#include "test_helpers.h"
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
@@ -10,11 +11,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define TEST_TASK_ROOT "/tmp/dot-explorer-task-test"
+static char TEST_TASK_ROOT[PATH_MAX];
 
 static void setup_task_env(void) {
+    assert(test_get_temp_dir(TEST_TASK_ROOT, sizeof(TEST_TASK_ROOT),
+                             "dot-explorer-task-test"));
     fs_delete_recursive(TEST_TASK_ROOT);
-    assert(mkdir(TEST_TASK_ROOT, 0700) == 0);
+    assert(platform_mkdir(TEST_TASK_ROOT, 0700) == 0);
 }
 
 static void teardown_task_env(void) {
@@ -44,7 +47,6 @@ static void test_task_copy_file_and_directory(void) {
     TaskStatus status = TASK_IDLE;
     uint64_t copied = 0, total = 0;
     char error_path[PATH_MAX];
-    int attempts = 0;
 
     setup_task_env();
 
@@ -56,11 +58,8 @@ static void test_task_copy_file_and_directory(void) {
     task_init(&task);
     assert(task_start_copy(&task, src_file, dst_file));
 
-    attempts = 0;
-    do {
-        task_snapshot(&task, &status, &copied, &total, error_path, sizeof(error_path));
-        if (status == TASK_RUNNING) usleep(1000);
-    } while (status == TASK_RUNNING && ++attempts < 5000);
+    task_reap(&task);
+    task_snapshot(&task, &status, &copied, &total, error_path, sizeof(error_path));
 
     assert(status == TASK_COMPLETED);
     assert(total > 0);
@@ -71,7 +70,7 @@ static void test_task_copy_file_and_directory(void) {
     /* 2. Test directory tree async copy */
     assert(utils_join_path(src_dir, sizeof(src_dir), TEST_TASK_ROOT, "source_tree"));
     assert(utils_join_path(dst_dir, sizeof(dst_dir), TEST_TASK_ROOT, "dest_tree"));
-    assert(mkdir(src_dir, 0700) == 0);
+    assert(platform_mkdir(src_dir, 0700) == 0);
 
     assert(utils_join_path(file1, sizeof(file1), src_dir, "f1.txt"));
     assert(utils_join_path(file2, sizeof(file2), src_dir, "f2.txt"));
@@ -80,21 +79,12 @@ static void test_task_copy_file_and_directory(void) {
 
     task_init(&task);
     assert(task_start_copy(&task, src_dir, dst_dir));
-    assert(task_is_running(&task) || task.status == TASK_COMPLETED);
-
-    /* Cannot start another copy while running */
-    if (task_is_running(&task)) {
-        errno = 0;
-        assert(!task_start_copy(&task, src_dir, dst_dir));
-        assert(errno == EBUSY);
-    }
+    task_snapshot(&task, &status, NULL, NULL, NULL, 0);
+    assert(status == TASK_RUNNING || status == TASK_COMPLETED);
 
     /* Wait for completion */
-    attempts = 0;
-    do {
-        task_snapshot(&task, &status, &copied, &total, error_path, sizeof(error_path));
-        if (status == TASK_RUNNING) usleep(1000);
-    } while (status == TASK_RUNNING && ++attempts < 5000);
+    task_reap(&task);
+    task_snapshot(&task, &status, &copied, &total, error_path, sizeof(error_path));
 
     assert(status == TASK_COMPLETED);
     assert(total > 0);
@@ -119,12 +109,11 @@ static void test_task_copy_multifile_progress(void) {
     TaskStatus status = TASK_IDLE;
     uint64_t copied = 0, total = 0;
     char error_path[PATH_MAX];
-    int attempts = 0;
 
     setup_task_env();
     assert(utils_join_path(src_dir, sizeof(src_dir), TEST_TASK_ROOT, "multi_src"));
     assert(utils_join_path(dst_dir, sizeof(dst_dir), TEST_TASK_ROOT, "multi_dst"));
-    assert(mkdir(src_dir, 0700) == 0);
+    assert(platform_mkdir(src_dir, 0700) == 0);
 
     assert(utils_join_path(f_small, sizeof(f_small), src_dir, "small.txt"));
     assert(utils_join_path(f_large, sizeof(f_large), src_dir, "large.bin"));
@@ -145,11 +134,8 @@ static void test_task_copy_multifile_progress(void) {
     task_init(&task);
     assert(task_start_copy(&task, src_dir, dst_dir));
 
-    attempts = 0;
-    do {
-        task_snapshot(&task, &status, &copied, &total, error_path, sizeof(error_path));
-        if (status == TASK_RUNNING) usleep(1000);
-    } while (status == TASK_RUNNING && ++attempts < 5000);
+    task_reap(&task);
+    task_snapshot(&task, &status, &copied, &total, error_path, sizeof(error_path));
 
     assert(status == TASK_COMPLETED);
     assert(total == 24 + sizeof(large_buf) + strlen("another small file"));
@@ -164,12 +150,11 @@ static void test_task_cancellation(void) {
     char src_dir[PATH_MAX], dst_dir[PATH_MAX];
     TaskStatus status = TASK_IDLE;
     char error_path[PATH_MAX];
-    int attempts = 0;
 
     setup_task_env();
     assert(utils_join_path(src_dir, sizeof(src_dir), TEST_TASK_ROOT, "big_source"));
     assert(utils_join_path(dst_dir, sizeof(dst_dir), TEST_TASK_ROOT, "big_dest"));
-    assert(mkdir(src_dir, 0700) == 0);
+    assert(platform_mkdir(src_dir, 0700) == 0);
 
     /* Create 200 files with some content to allow cancellation window */
     for (int i = 0; i < 200; ++i) {
@@ -182,11 +167,8 @@ static void test_task_cancellation(void) {
     task_init(&task);
     assert(task_start_copy(&task, src_dir, dst_dir));
     task_request_cancel(&task);
-
-    do {
-        task_snapshot(&task, &status, NULL, NULL, error_path, sizeof(error_path));
-        if (status == TASK_RUNNING) usleep(1000);
-    } while (status == TASK_RUNNING && ++attempts < 5000);
+    task_reap(&task);
+    task_snapshot(&task, &status, NULL, NULL, error_path, sizeof(error_path));
 
     assert(status == TASK_CANCELLED || status == TASK_COMPLETED);
     task_cleanup(&task);
@@ -195,7 +177,15 @@ static void test_task_cancellation(void) {
 
 static void test_task_invalid_inputs(void) {
     Task task;
+    char missing_source[PATH_MAX];
+    char missing_destination[PATH_MAX];
+    char temp_dir[PATH_MAX];
     task_init(&task);
+    assert(test_get_temp_dir(temp_dir, sizeof(temp_dir), NULL));
+    assert(utils_join_path(missing_source, sizeof(missing_source), temp_dir,
+                           "dot-explorer-missing-source"));
+    assert(utils_join_path(missing_destination, sizeof(missing_destination), temp_dir,
+                           "dot-explorer-missing-destination"));
 
     /* Invalid arguments */
     errno = 0;
@@ -208,8 +198,18 @@ static void test_task_invalid_inputs(void) {
     assert(!task_start_copy(&task, "source", NULL));
     assert(errno == EINVAL);
 
-    assert(!task_start_copy(&task, "/nonexistent_xyz_123", "/tmp/dest"));
+    assert(!task_start_copy(&task, missing_source, missing_destination));
     assert(errno == EINVAL);
+
+    pthread_mutex_lock(&task.mutex);
+    task.status = TASK_RUNNING;
+    pthread_mutex_unlock(&task.mutex);
+    errno = 0;
+    assert(!task_start_copy(&task, ".", missing_destination));
+    assert(errno == EBUSY);
+    pthread_mutex_lock(&task.mutex);
+    task.status = TASK_IDLE;
+    pthread_mutex_unlock(&task.mutex);
 
     task_cleanup(&task);
 }
