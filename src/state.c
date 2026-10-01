@@ -219,15 +219,7 @@ bool clipboard_add_entry(Clipboard *clipboard, const char *path) {
     clipboard->paths[clipboard->count++] = copy;
 
     if (clipboard->source_dir[0] == '\0') {
-        separator = strrchr(absolute_path, '/');
-#ifdef _WIN32
-        {
-            const char *backslash = strrchr(absolute_path, '\\');
-            if (backslash && (!separator || backslash > separator)) {
-                separator = backslash;
-            }
-        }
-#endif
+        separator = path_find_last_separator(absolute_path);
         if (!separator) {
             snprintf(source_dir, sizeof(source_dir), ".");
         } else if (separator == absolute_path) {

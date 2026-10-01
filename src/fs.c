@@ -53,29 +53,21 @@ static bool set_error_path(char *error_path, size_t error_path_size, const char 
 
 static bool parent_is_writable(const char *path) {
     char parent[PATH_MAX];
-    char *separator;
+    const char *separator;
 
     if (strlen(path) >= sizeof(parent)) {
         errno = ENAMETOOLONG;
         return false;
     }
     strcpy(parent, path);
-    separator = strrchr(parent, '/');
-#ifdef _WIN32
-    {
-        char *backslash = strrchr(parent, '\\');
-        if (backslash && (!separator || backslash > separator)) {
-            separator = backslash;
-        }
-    }
-#endif
+    separator = path_find_last_separator(parent);
     if (!separator) {
         return access(".", W_OK | X_OK) == 0;
     }
     if (separator == parent) {
-        separator[1] = '\0';
+        parent[1] = '\0';
     } else {
-        *separator = '\0';
+        parent[separator - parent] = '\0';
     }
     return access(parent, W_OK | X_OK) == 0;
 }
@@ -85,7 +77,7 @@ static bool destination_is_inside_source(const char *source, const char *destina
     char source_real[PATH_MAX];
     char parent[PATH_MAX];
     char parent_real[PATH_MAX];
-    char *separator;
+    const char *separator;
     size_t source_length;
 
     if (lstat(source, &source_stat) != 0 || !S_ISDIR(source_stat.st_mode) ||
@@ -94,19 +86,13 @@ static bool destination_is_inside_source(const char *source, const char *destina
         return false;
     }
     strcpy(parent, destination);
-    separator = strrchr(parent, '/');
-#ifdef _WIN32
-    {
-        char *backslash = strrchr(parent, '\\');
-        if (backslash && (!separator || backslash > separator)) separator = backslash;
-    }
-#endif
+    separator = path_find_last_separator(parent);
     if (!separator) {
         strcpy(parent, ".");
     } else if (separator == parent) {
-        separator[1] = '\0';
+        parent[1] = '\0';
     } else {
-        *separator = '\0';
+        parent[separator - parent] = '\0';
     }
     if (!platform_realpath(parent, parent_real, sizeof(parent_real))) {
         return false;

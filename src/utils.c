@@ -21,13 +21,18 @@ void format_size(size_t size, char *buf, size_t buf_size) {
     }
 }
 
-const char *path_basename(const char *path) {
-    const char *separator = strrchr(path, '/');
-    const char *backslash = strrchr(path, '\\');
+const char *path_find_last_separator(const char *path) {
+    const char *separator;
+    const char *backslash;
 
-    if (backslash && (!separator || backslash > separator)) {
-        separator = backslash;
-    }
+    if (!path) return NULL;
+    separator = strrchr(path, '/');
+    backslash = strrchr(path, '\\');
+    return backslash && (!separator || backslash > separator) ? backslash : separator;
+}
+
+const char *path_basename(const char *path) {
+    const char *separator = path_find_last_separator(path);
     return separator ? separator + 1 : path;
 }
 
