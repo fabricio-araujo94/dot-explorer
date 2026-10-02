@@ -63,20 +63,6 @@ int state_visible_index(const AppState *state, int view_index) {
     return view_index >= 0 && view_index < state->dir_list.count ? view_index : -1;
 }
 
-static bool set_error_path(char *error_path, size_t error_path_size, const char *path) {
-    int written;
-    if (!error_path || error_path_size == 0) {
-        return false;
-    }
-    written = snprintf(error_path, error_path_size, "%s", path ? path : "");
-    if (written < 0 || (size_t)written >= error_path_size) {
-        error_path[error_path_size - 1] = '\0';
-        errno = ENAMETOOLONG;
-        return false;
-    }
-    return true;
-}
-
 static void history_clear_stack(HistoryEntry **entries, size_t *count,
                                 size_t *capacity) {
     free(*entries);

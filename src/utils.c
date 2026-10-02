@@ -21,6 +21,21 @@ void format_size(size_t size, char *buf, size_t buf_size) {
     }
 }
 
+bool set_error_path(char *error_path, size_t error_path_size, const char *path) {
+    int written;
+
+    if (!error_path || error_path_size == 0) {
+        return false;
+    }
+    written = snprintf(error_path, error_path_size, "%s", path ? path : "");
+    if (written < 0 || (size_t)written >= error_path_size) {
+        error_path[error_path_size - 1] = '\0';
+        errno = ENAMETOOLONG;
+        return false;
+    }
+    return true;
+}
+
 const char *path_find_last_separator(const char *path) {
     const char *separator;
     const char *backslash;

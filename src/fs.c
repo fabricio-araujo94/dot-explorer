@@ -37,20 +37,6 @@ static bool is_protected_delete_path(const char *path) {
            (seg_len == 2 && name[0] == '.' && name[1] == '.');
 }
 
-static bool set_error_path(char *error_path, size_t error_path_size, const char *path) {
-    int written;
-    if (!error_path || error_path_size == 0) {
-        return false;
-    }
-    written = snprintf(error_path, error_path_size, "%s", path);
-    if (written < 0 || (size_t)written >= error_path_size) {
-        error_path[error_path_size - 1] = '\0';
-        errno = ENAMETOOLONG;
-        return false;
-    }
-    return true;
-}
-
 static bool parent_is_writable(const char *path) {
     char parent[PATH_MAX];
     const char *separator;

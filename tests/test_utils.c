@@ -29,6 +29,21 @@ static void test_format_size(void) {
     assert(strcmp(buf, "5.0 GB") == 0);
 }
 
+static void test_set_error_path(void) {
+    char buffer[8];
+
+    assert(set_error_path(buffer, sizeof(buffer), "error"));
+    assert(strcmp(buffer, "error") == 0);
+
+    assert(set_error_path(buffer, sizeof(buffer), NULL));
+    assert(buffer[0] == '\0');
+
+    errno = 0;
+    assert(!set_error_path(buffer, 4, "too long"));
+    assert(errno == ENAMETOOLONG);
+    assert(buffer[3] == '\0');
+}
+
 static void test_utils_join_path(void) {
     char result[PATH_MAX];
 
@@ -142,6 +157,7 @@ static void test_theme_and_icons(void) {
 
 int main(void) {
     test_format_size();
+    test_set_error_path();
     test_utils_join_path();
     test_path_basename();
     test_path_find_last_separator();
