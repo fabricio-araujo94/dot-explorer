@@ -7,8 +7,6 @@
 
 typedef struct {
     AppState state;
-    char cwd[PATH_MAX];
-    int selected_index;
     int x;
     int y;
     int width;

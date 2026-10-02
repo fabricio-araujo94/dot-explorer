@@ -127,11 +127,6 @@ void ui_show_message(const char *title, const char *message) {
     delwin(win);
 }
 
-static void pane_sync(Pane *pane) {
-    snprintf(pane->cwd, sizeof(pane->cwd), "%s", pane->state.current_path);
-    pane->selected_index = pane->state.selected_index;
-}
-
 static const char *file_extension(const char *name) {
     const char *dot = strrchr(name, '.');
     return dot ? dot : "";
@@ -216,7 +211,8 @@ static void draw_pane(const Pane *pane, bool active) {
         attroff(attributes);
     }
     attron(active ? (COLOR_PAIR(3) | A_BOLD) : COLOR_PAIR(2));
-    safe_draw_line(pane->y + pane->height - 1, pane->x + 2, pane->cwd, pane->width - 4);
+    safe_draw_line(pane->y + pane->height - 1, pane->x + 2,
+                   pane->state.current_path, pane->width - 4);
     attroff(active ? (COLOR_PAIR(3) | A_BOLD) : COLOR_PAIR(2));
 }
 
@@ -224,8 +220,6 @@ void ui_dual_init(DualPaneUI *ui) {
     memset(ui, 0, sizeof(*ui));
     state_init(&ui->panes[0].state);
     state_init(&ui->panes[1].state);
-    pane_sync(&ui->panes[0]);
-    pane_sync(&ui->panes[1]);
     ui->active_pane_index = 0;
     memset(&ui->clipboard, 0, sizeof(ui->clipboard));
     ui->task_destination_pane = -1;
@@ -272,7 +266,6 @@ void ui_update(DualPaneUI *ui) {
         if (ui->task_destination_pane >= 0 && ui->task_destination_pane < 2) {
             Pane *destination = &ui->panes[ui->task_destination_pane];
             state_change_dir(&destination->state, ".");
-            pane_sync(destination);
         }
         ui->task_refresh_pending = false;
     } else if ((status == TASK_FAILED || status == TASK_CANCELLED) &&
@@ -298,8 +291,6 @@ void ui_draw(DualPaneUI *ui) {
     ui->panes[1].y = 0;
     ui->panes[1].width = max_x - left_width;
     ui->panes[1].height = max_y;
-    pane_sync(&ui->panes[0]);
-    pane_sync(&ui->panes[1]);
 
     erase();
     draw_pane(&ui->panes[0], ui->active_pane_index == 0);
@@ -396,12 +387,10 @@ void ui_handle_input(DualPaneUI *ui, int ch) {
             ui_show_message("Paste failed", error_path);
         }
         state_change_dir(&active->state, ".");
-        pane_sync(active);
         return;
     }
     if (ch != DOT_KEY_PASTE) {
         input_handle(&active->state, &ui->clipboard, ch, &ui_input_callbacks);
     }
-    pane_sync(active);
 }
 
