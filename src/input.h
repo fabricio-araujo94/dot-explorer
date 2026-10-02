@@ -25,6 +25,15 @@
 #define KEY_ENTER 0527
 #endif
 
+typedef struct {
+    int key_code;
+} InputKeyEvent;
+
+static inline InputKeyEvent input_key_event(int key_code) {
+    InputKeyEvent event = { key_code };
+    return event;
+}
+
 typedef struct InputCallbacks {
     bool (*prompt)(const char *prompt, char *buffer, size_t buf_size, void *userdata);
     void (*show_message)(const char *title, const char *message, void *userdata);
@@ -36,6 +45,7 @@ typedef struct InputCallbacks {
     void *userdata;
 } InputCallbacks;
 
-void input_handle(AppState *state, Clipboard *clipboard, int ch, const InputCallbacks *callbacks);
+void input_handle(AppState *state, Clipboard *clipboard, InputKeyEvent event,
+                  const InputCallbacks *callbacks);
 
 #endif // INPUT_H

@@ -395,7 +395,8 @@ void ui_handle_input(DualPaneUI *ui, int ch) {
         return;
     }
     if (ch != DOT_KEY_PASTE) {
-        input_handle(&active->state, &ui->clipboard, ch, &ui_input_callbacks);
+        input_handle(&active->state, &ui->clipboard, input_key_event(ch),
+                 &ui_input_callbacks);
     }
 }
 

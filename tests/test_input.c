@@ -123,7 +123,7 @@ static void test_quit_command(void) {
     init_mock_context(&ctx, &icb);
 
     assert(!state.should_quit);
-    input_handle(&state, &cb, DOT_KEY_QUIT, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_QUIT), &icb);
     assert(state.should_quit);
 
     state_cleanup(&state);
@@ -153,20 +153,20 @@ static void test_navigation_and_selection(void) {
     assert(state.selected_index == 0);
 
     /* Move down */
-    input_handle(&state, &cb, KEY_DOWN, &icb);
+    input_handle(&state, &cb, input_key_event(KEY_DOWN), &icb);
     assert(state.selected_index == 1);
-    input_handle(&state, &cb, DOT_KEY_DOWN_DIR, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_DOWN_DIR), &icb);
     assert(state.selected_index == 2);
 
     /* Move up */
-    input_handle(&state, &cb, KEY_UP, &icb);
+    input_handle(&state, &cb, input_key_event(KEY_UP), &icb);
     assert(state.selected_index == 1);
-    input_handle(&state, &cb, DOT_KEY_UP_DIR, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_UP_DIR), &icb);
     assert(state.selected_index == 0);
 
     /* Selection toggle */
     assert(!state.dir_list.entries[0].is_selected);
-    input_handle(&state, &cb, DOT_KEY_SELECT, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_SELECT), &icb);
     assert(state.dir_list.entries[0].is_selected);
     assert(state.selected_index == 1);
 
@@ -184,13 +184,13 @@ static void test_sorting_commands(void) {
     memset(&cb, 0, sizeof(cb));
     init_mock_context(&ctx, &icb);
 
-    input_handle(&state, &cb, DOT_KEY_SORT_SIZE, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_SORT_SIZE), &icb);
     assert(state.sort_type == SORT_SIZE);
 
-    input_handle(&state, &cb, DOT_KEY_SORT_DATE, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_SORT_DATE), &icb);
     assert(state.sort_type == SORT_DATE);
 
-    input_handle(&state, &cb, DOT_KEY_SORT_NAME, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_SORT_NAME), &icb);
     assert(state.sort_type == SORT_NAME);
 
     state_cleanup(&state);
@@ -221,13 +221,13 @@ static void test_clipboard_copy_and_cut(void) {
     }
 
     /* Copy */
-    input_handle(&state, &cb, DOT_KEY_COPY, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_COPY), &icb);
     assert(cb.count == 1);
     assert(!cb.is_cut);
     assert(strstr(cb.paths[0], "sample.txt") != NULL);
 
     /* Cut */
-    input_handle(&state, &cb, DOT_KEY_CUT, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_CUT), &icb);
     assert(cb.count == 1);
     assert(cb.is_cut);
 
@@ -251,13 +251,13 @@ static void test_create_file_and_dir(void) {
 
     /* Create file */
     snprintf(ctx.prompt_response, sizeof(ctx.prompt_response), "newfile.txt");
-    input_handle(&state, &cb, DOT_KEY_CREATE_FILE, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_CREATE_FILE), &icb);
     utils_join_path(expected_file, sizeof(expected_file), TEST_INPUT_ROOT, "newfile.txt");
     assert(access(expected_file, F_OK) == 0);
 
     /* Create directory */
     snprintf(ctx.prompt_response, sizeof(ctx.prompt_response), "newdir");
-    input_handle(&state, &cb, DOT_KEY_CREATE_DIR, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_CREATE_DIR), &icb);
     utils_join_path(expected_dir, sizeof(expected_dir), TEST_INPUT_ROOT, "newdir");
     assert(access(expected_dir, F_OK) == 0);
 
@@ -292,7 +292,7 @@ static void test_rename_and_delete(void) {
 
     /* Rename */
     snprintf(ctx.prompt_response, sizeof(ctx.prompt_response), "renamed.txt");
-    input_handle(&state, &cb, DOT_KEY_RENAME_ITEM, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_RENAME_ITEM), &icb);
     assert(access(initial_path, F_OK) != 0);
     assert(access(renamed_path, F_OK) == 0);
 
@@ -306,12 +306,12 @@ static void test_rename_and_delete(void) {
 
     /* Delete with 'n' response */
     snprintf(ctx.prompt_response, sizeof(ctx.prompt_response), "n");
-    input_handle(&state, &cb, DOT_KEY_DELETE_ITEM, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_DELETE_ITEM), &icb);
     assert(access(renamed_path, F_OK) == 0);
 
     /* Delete with 'y' response */
     snprintf(ctx.prompt_response, sizeof(ctx.prompt_response), "y");
-    input_handle(&state, &cb, DOT_KEY_DELETE_ITEM, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_DELETE_ITEM), &icb);
     assert(access(renamed_path, F_OK) != 0);
 
     state_cleanup(&state);
@@ -341,7 +341,7 @@ static void test_properties(void) {
         }
     }
 
-    input_handle(&state, &cb, DOT_KEY_PROPERTIES, &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_PROPERTIES), &icb);
     assert(ctx.message_count == 1);
     assert(strcmp(ctx.last_message_title, "Properties") == 0);
     assert(strstr(ctx.last_message_body, "props.txt") != NULL);
@@ -374,7 +374,7 @@ static void test_filter_prompt_interactive(void) {
     ctx.key_stream_len = sizeof(keys) / sizeof(keys[0]);
     ctx.key_stream_pos = 0;
 
-    input_handle(&state, &cb, '/', &icb);
+    input_handle(&state, &cb, input_key_event('/'), &icb);
     assert(state.filter_active);
     assert(strcmp(state.filter_query, "ap") == 0);
 
@@ -384,7 +384,7 @@ static void test_filter_prompt_interactive(void) {
     ctx.key_stream_len = 1;
     ctx.key_stream_pos = 0;
 
-    input_handle(&state, &cb, '/', &icb);
+    input_handle(&state, &cb, input_key_event('/'), &icb);
     assert(!state.filter_active);
     assert(state.filter_query[0] == '\0');
 

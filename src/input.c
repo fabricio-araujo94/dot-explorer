@@ -542,12 +542,14 @@ static const KeyBinding key_bindings[] = {
     { DOT_KEY_PROPERTIES, handle_properties_action },
 };
 
-void input_handle(AppState *state, Clipboard *clipboard, int ch, const InputCallbacks *callbacks) {
+void input_handle(AppState *state, Clipboard *clipboard, InputKeyEvent event,
+                  const InputCallbacks *callbacks) {
+    int key_code = event.key_code;
     if (!state) return;
 
     for (size_t i = 0; i < sizeof(key_bindings) / sizeof(key_bindings[0]); ++i) {
-        if (key_bindings[i].key == ch) {
-            key_bindings[i].handler(state, clipboard, callbacks, ch);
+        if (key_bindings[i].key == key_code) {
+            key_bindings[i].handler(state, clipboard, callbacks, key_code);
             return;
         }
     }
