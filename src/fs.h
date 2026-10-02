@@ -19,8 +19,8 @@ typedef struct {
 
 typedef struct {
     FileEntry *entries;
-    int count;
-    int capacity;
+    size_t count;
+    size_t capacity;
 } DirectoryList;
 
 typedef enum {

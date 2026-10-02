@@ -415,8 +415,9 @@ bool fs_read_dir(const char *path, DirectoryList *list) {
         if (strcmp(dp->d_name, ".") == 0) continue;
         
         if (list->count >= list->capacity) {
-            int new_capacity = list->capacity == 0 ? 128 : list->capacity * 2;
-            FileEntry *new_entries = (FileEntry *)realloc(list->entries, (size_t)new_capacity * sizeof(FileEntry));
+                size_t new_capacity = list->capacity == 0 ? 128 : list->capacity * 2;
+                FileEntry *new_entries = (FileEntry *)realloc(
+                    list->entries, new_capacity * sizeof(FileEntry));
             if (!new_entries) {
                 closedir(dir);
                 errno = ENOMEM;

@@ -213,9 +213,9 @@ static void test_clipboard_copy_and_cut(void) {
     init_mock_context(&ctx, &icb);
 
     /* Find sample.txt index */
-    for (int i = 0; i < state.dir_list.count; ++i) {
+    for (size_t i = 0; i < state.dir_list.count; ++i) {
         if (strcmp(state.dir_list.entries[i].name, "sample.txt") == 0) {
-            state.selected_index = i;
+            state.selected_index = (int)i;
             break;
         }
     }
@@ -283,9 +283,9 @@ static void test_rename_and_delete(void) {
     init_mock_context(&ctx, &icb);
 
     /* Select orig.txt */
-    for (int i = 0; i < state.dir_list.count; ++i) {
+    for (size_t i = 0; i < state.dir_list.count; ++i) {
         if (strcmp(state.dir_list.entries[i].name, "orig.txt") == 0) {
-            state.selected_index = i;
+            state.selected_index = (int)i;
             break;
         }
     }
@@ -297,9 +297,9 @@ static void test_rename_and_delete(void) {
     assert(access(renamed_path, F_OK) == 0);
 
     /* Select renamed.txt */
-    for (int i = 0; i < state.dir_list.count; ++i) {
+    for (size_t i = 0; i < state.dir_list.count; ++i) {
         if (strcmp(state.dir_list.entries[i].name, "renamed.txt") == 0) {
-            state.selected_index = i;
+            state.selected_index = (int)i;
             break;
         }
     }
@@ -334,9 +334,9 @@ static void test_properties(void) {
     memset(&cb, 0, sizeof(cb));
     init_mock_context(&ctx, &icb);
 
-    for (int i = 0; i < state.dir_list.count; ++i) {
+    for (size_t i = 0; i < state.dir_list.count; ++i) {
         if (strcmp(state.dir_list.entries[i].name, "props.txt") == 0) {
-            state.selected_index = i;
+            state.selected_index = (int)i;
             break;
         }
     }

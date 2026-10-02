@@ -174,7 +174,7 @@ static void safe_draw_line(int y, int x, const char *str, int max_cols) {
 
 static void draw_pane(const Pane *pane, bool active) {
     int list_height = pane->height - 2;
-    int visible_count = state_visible_count(&pane->state);
+    size_t visible_count = state_visible_count(&pane->state);
     int content_width = pane->width - 2;
 
     if (pane->width < 4 || pane->height < 3) return;
@@ -191,9 +191,9 @@ static void draw_pane(const Pane *pane, bool active) {
     attroff(active ? (COLOR_PAIR(THEME_PAIR_ACTIVE) | A_BOLD) :
                     COLOR_PAIR(THEME_PAIR_NORMAL));
 
-    for (int row = 0; row < list_height &&
-                       row + pane->state.scroll_offset < visible_count; ++row) {
+    for (int row = 0; row < list_height; ++row) {
         int view_index = row + pane->state.scroll_offset;
+        if (view_index < 0 || (size_t)view_index >= visible_count) break;
         int original_index = state_visible_index(&pane->state, view_index);
         const FileEntry *entry = &pane->state.dir_list.entries[original_index];
         int screen_y = pane->y + row + 1;

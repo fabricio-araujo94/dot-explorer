@@ -62,8 +62,10 @@ static void navigate_history(AppState *state, bool forward) {
     state_change_dir(state, path);
     if (state->dir_list.count > 0) {
         if (selected_index < 0) selected_index = 0;
-        if (selected_index >= state->dir_list.count) {
-            selected_index = state->dir_list.count - 1;
+        if ((size_t)selected_index >= state->dir_list.count) {
+            size_t last_index = state->dir_list.count - 1;
+            selected_index = last_index > (size_t)INT_MAX ?
+                             INT_MAX : (int)last_index;
         }
         state->selected_index = selected_index;
     } else {
@@ -73,14 +75,16 @@ static void navigate_history(AppState *state, bool forward) {
 
 static int current_view_index(const AppState *state) {
     if (!state->filter_active) return state->selected_index;
-    for (int i = 0; i < state->filtered_entries.count; ++i) {
-        if (state->filtered_entries.indices[i] == state->selected_index) return i;
+    for (size_t i = 0; i < state->filtered_entries.count; ++i) {
+        if (state->filtered_entries.indices[i] == state->selected_index) {
+            return i <= (size_t)INT_MAX ? (int)i : -1;
+        }
     }
     return -1;
 }
 
 static void move_visible_selection(AppState *state, int view_index, int list_height) {
-    int visible_count = state_visible_count(state);
+    size_t visible_count = state_visible_count(state);
     int original_index;
     if (visible_count == 0) {
         state->selected_index = 0;
@@ -88,7 +92,9 @@ static void move_visible_selection(AppState *state, int view_index, int list_hei
         return;
     }
     if (view_index < 0) view_index = 0;
-    if (view_index >= visible_count) view_index = visible_count - 1;
+    if (view_index >= 0 && (size_t)view_index >= visible_count) {
+        view_index = (int)(visible_count - 1);
+    }
     original_index = state_visible_index(state, view_index);
     if (original_index >= 0) state->selected_index = original_index;
     if (view_index < state->scroll_offset) state->scroll_offset = view_index;
@@ -147,18 +153,19 @@ static bool capture_clipboard(AppState *state, Clipboard *clipboard, bool is_cut
 
     if (!clipboard) return false;
     clipboard_clear(clipboard);
-    for (int i = 0; i < state->dir_list.count; ++i) {
+    for (size_t i = 0; i < state->dir_list.count; ++i) {
         if (state->dir_list.entries[i].is_selected) {
             has_selected = true;
             break;
         }
     }
-    for (int i = 0; i < state->dir_list.count; ++i) {
+    for (size_t i = 0; i < state->dir_list.count; ++i) {
         char path[PATH_MAX];
         if (has_selected && !state->dir_list.entries[i].is_selected) {
             continue;
         }
-        if (!has_selected && i != state->selected_index) {
+        if (!has_selected && (state->selected_index < 0 ||
+                      i != (size_t)state->selected_index)) {
             continue;
         }
         if (is_navigation_entry(&state->dir_list.entries[i])) {
@@ -278,7 +285,8 @@ static void handle_select_action(AppState *state, Clipboard *clipboard, const In
     int list_height = cb_get_list_height(callbacks);
     FileEntry *entry = &state->dir_list.entries[state->selected_index];
     entry->is_selected = !entry->is_selected;
-    if (state->selected_index < state->dir_list.count - 1) {
+    if (state->selected_index >= 0 &&
+        (size_t)state->selected_index < state->dir_list.count - 1) {
         state->selected_index++;
         if (state->selected_index >= state->scroll_offset + list_height) {
             state->scroll_offset = state->selected_index - list_height + 1;
@@ -286,16 +294,17 @@ static void handle_select_action(AppState *state, Clipboard *clipboard, const In
     }
 }
 
-static void handle_delete_selected_items(AppState *state, const InputCallbacks *callbacks, int selected_count) {
+static void handle_delete_selected_items(AppState *state, const InputCallbacks *callbacks,
+                                         size_t selected_count) {
     char prompt_msg[256];
     char buf[256];
     snprintf(prompt_msg, sizeof(prompt_msg),
-             "Delete %d selected item%s? (y/n): ",
+             "Delete %zu selected item%s? (y/n): ",
              selected_count, selected_count > 1 ? "s" : "");
     if (cb_prompt(callbacks, prompt_msg, buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
         bool any_fail = false;
         char fail_msg[PATH_MAX + 64] = "";
-        for (int i = 0; i < state->dir_list.count; ++i) {
+        for (size_t i = 0; i < state->dir_list.count; ++i) {
             FileEntry *entry = &state->dir_list.entries[i];
             if (entry->is_selected && !is_navigation_entry(entry)) {
                 char full_path[PATH_MAX];
@@ -338,8 +347,8 @@ static void handle_delete_action(AppState *state, Clipboard *clipboard, const In
     if (state->dir_list.count == 0) {
         return;
     }
-    int selected_count = 0;
-    for (int i = 0; i < state->dir_list.count; ++i) {
+    size_t selected_count = 0;
+    for (size_t i = 0; i < state->dir_list.count; ++i) {
         if (state->dir_list.entries[i].is_selected &&
             !is_navigation_entry(&state->dir_list.entries[i])) {
             selected_count++;

@@ -28,8 +28,8 @@ typedef struct {
 
 typedef struct {
     int *indices;
-    int count;
-    int capacity;
+    size_t count;
+    size_t capacity;
 } EntryList;
 
 typedef struct {
@@ -51,7 +51,7 @@ void state_cleanup(AppState *state);
 bool state_change_dir(AppState *state, const char *new_path);
 void entry_list_clear(EntryList *list);
 bool filter_entries(const char *query, const DirectoryList *source, EntryList *list);
-int state_visible_count(const AppState *state);
+size_t state_visible_count(const AppState *state);
 int state_visible_index(const AppState *state, int view_index);
 bool clipboard_add_entry(Clipboard *clipboard, const char *path);
 void clipboard_clear(Clipboard *clipboard);

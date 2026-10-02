@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <limits.h>
 
 void entry_list_clear(EntryList *list) {
     if (!list) return;
@@ -31,12 +32,12 @@ bool filter_entries(const char *query, const DirectoryList *source, EntryList *l
         return false;
     }
     list->count = 0;
-    for (int i = 0; i < source->count; ++i) {
+    for (size_t i = 0; i < source->count; ++i) {
         if (fuzzy_match(source->entries[i].name, query)) {
             if (list->count == list->capacity) {
-                int new_capacity = list->capacity == 0 ? 32 : list->capacity * 2;
+                size_t new_capacity = list->capacity == 0 ? 32 : list->capacity * 2;
                 int *new_indices = realloc(list->indices,
-                                            (size_t)new_capacity * sizeof(*new_indices));
+                                            new_capacity * sizeof(*new_indices));
                 if (!new_indices) {
                     errno = ENOMEM;
                     list->count = 0;
@@ -45,22 +46,27 @@ bool filter_entries(const char *query, const DirectoryList *source, EntryList *l
                 list->indices = new_indices;
                 list->capacity = new_capacity;
             }
-            list->indices[list->count++] = i;
+            if (i > (size_t)INT_MAX) {
+                errno = EOVERFLOW;
+                list->count = 0;
+                return false;
+            }
+            list->indices[list->count++] = (int)i;
         }
     }
     return true;
 }
 
-int state_visible_count(const AppState *state) {
+size_t state_visible_count(const AppState *state) {
     return state->filter_active ? state->filtered_entries.count : state->dir_list.count;
 }
 
 int state_visible_index(const AppState *state, int view_index) {
     if (state->filter_active) {
-        if (view_index < 0 || view_index >= state->filtered_entries.count) return -1;
+        if (view_index < 0 || (size_t)view_index >= state->filtered_entries.count) return -1;
         return state->filtered_entries.indices[view_index];
     }
-    return view_index >= 0 && view_index < state->dir_list.count ? view_index : -1;
+    return view_index >= 0 && (size_t)view_index < state->dir_list.count ? view_index : -1;
 }
 
 static void history_clear_stack(HistoryEntry **entries, size_t *count,
@@ -332,8 +338,8 @@ bool state_change_dir(AppState *state, const char *new_path) {
     int old_selected_index = state->selected_index;
     int old_scroll_offset = state->scroll_offset;
 
-    if (is_refresh && state->dir_list.count > 0 &&
-        state->selected_index >= 0 && state->selected_index < state->dir_list.count) {
+    if (is_refresh && state->dir_list.count > 0 && state->selected_index >= 0 &&
+        (size_t)state->selected_index < state->dir_list.count) {
         strncpy(saved_selected_name, state->dir_list.entries[state->selected_index].name,
                 sizeof(saved_selected_name) - 1);
         saved_selected_name[sizeof(saved_selected_name) - 1] = '\0';
@@ -367,9 +373,9 @@ bool state_change_dir(AppState *state, const char *new_path) {
         if (is_refresh && state->dir_list.count > 0) {
             int restored_index = -1;
             if (saved_selected_name[0] != '\0') {
-                for (int i = 0; i < state->dir_list.count; ++i) {
+                for (size_t i = 0; i < state->dir_list.count; ++i) {
                     if (strcmp(state->dir_list.entries[i].name, saved_selected_name) == 0) {
-                        restored_index = i;
+                        if (i <= (size_t)INT_MAX) restored_index = (int)i;
                         break;
                     }
                 }
@@ -377,8 +383,14 @@ bool state_change_dir(AppState *state, const char *new_path) {
             if (restored_index >= 0) {
                 state->selected_index = restored_index;
             } else {
-                state->selected_index = old_selected_index < state->dir_list.count ?
-                                        old_selected_index : state->dir_list.count - 1;
+                if (old_selected_index >= 0 &&
+                    (size_t)old_selected_index < state->dir_list.count) {
+                    state->selected_index = old_selected_index;
+                } else {
+                    size_t last_index = state->dir_list.count - 1;
+                    state->selected_index = last_index > (size_t)INT_MAX ?
+                                            INT_MAX : (int)last_index;
+                }
             }
             state->scroll_offset = old_scroll_offset <= state->selected_index ?
                                    old_scroll_offset : state->selected_index;

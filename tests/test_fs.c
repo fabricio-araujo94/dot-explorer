@@ -371,9 +371,9 @@ static void test_refresh_preserves_selection_and_scroll(void) {
 
     /* Find b_second.txt and select it */
     int target_idx = -1;
-    for (int i = 0; i < state.dir_list.count; ++i) {
+    for (size_t i = 0; i < state.dir_list.count; ++i) {
         if (strcmp(state.dir_list.entries[i].name, "b_second.txt") == 0) {
-            target_idx = i;
+            target_idx = (int)i;
             break;
         }
     }
