@@ -10,6 +10,8 @@
 #define DOT_KEY_ENTER_DIR '\n'
 #define DOT_KEY_BACK_DIR 'h'
 #define DOT_KEY_REFRESH 'r'
+#define DOT_KEY_HISTORY_BACK 15
+#define DOT_KEY_HISTORY_FORWARD 29
 
 #define DOT_KEY_SELECT ' '
 #define DOT_KEY_DELETE_ITEM 'd'
