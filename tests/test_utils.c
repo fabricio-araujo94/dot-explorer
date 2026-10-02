@@ -126,33 +126,33 @@ static void test_theme_and_icons(void) {
 
     /* Directory */
     theme = get_file_color_and_icon(S_IFDIR | 0755, "");
-    assert(theme.color_pair == 5); /* THEME_PAIR_DIRECTORY */
+    assert(theme.color_pair == THEME_PAIR_DIRECTORY);
     assert(strcmp(theme.icon, "\xEF\x81\xBB") == 0);
 
     /* Symlink */
     theme = get_file_color_and_icon(S_IFLNK | 0777, "");
-    assert(theme.color_pair == 9); /* THEME_PAIR_SYMLINK */
+    assert(theme.color_pair == THEME_PAIR_SYMLINK);
 
     /* Executable file */
     theme = get_file_color_and_icon(S_IFREG | 0755, "");
-    assert(theme.color_pair == 6); /* THEME_PAIR_EXECUTABLE */
+    assert(theme.color_pair == THEME_PAIR_EXECUTABLE);
 
     /* Image extension */
     theme = get_file_color_and_icon(S_IFREG | 0644, ".png");
-    assert(theme.color_pair == 7); /* THEME_PAIR_IMAGE */
+    assert(theme.color_pair == THEME_PAIR_IMAGE);
 
     theme = get_file_color_and_icon(S_IFREG | 0644, ".JPG");
-    assert(theme.color_pair == 7); /* Case insensitive */
+    assert(theme.color_pair == THEME_PAIR_IMAGE); /* Case insensitive */
 
     /* Archive extension */
     theme = get_file_color_and_icon(S_IFREG | 0644, ".tar.gz");
     /* .tar.gz checks ends with or extension */
     theme = get_file_color_and_icon(S_IFREG | 0644, ".zip");
-    assert(theme.color_pair == 8); /* THEME_PAIR_ARCHIVE */
+    assert(theme.color_pair == THEME_PAIR_ARCHIVE);
 
     /* Normal text file */
     theme = get_file_color_and_icon(S_IFREG | 0644, ".txt");
-    assert(theme.color_pair == 2); /* THEME_PAIR_NORMAL */
+    assert(theme.color_pair == THEME_PAIR_NORMAL);
 }
 
 int main(void) {

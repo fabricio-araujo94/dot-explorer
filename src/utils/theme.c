@@ -3,13 +3,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-#define THEME_PAIR_NORMAL 2
-#define THEME_PAIR_DIRECTORY 5
-#define THEME_PAIR_EXECUTABLE 6
-#define THEME_PAIR_IMAGE 7
-#define THEME_PAIR_ARCHIVE 8
-#define THEME_PAIR_SYMLINK 9
-
 static bool extension_is(const char *ext, const char *const *extensions, size_t count) {
     if (!ext || !*ext) {
         return false;

@@ -19,15 +19,15 @@ void ui_init(void) {
     if (has_colors()) {
         start_color();
         use_default_colors();
-        init_pair(1, COLOR_CYAN, -1);
-        init_pair(2, COLOR_WHITE, -1);
-        init_pair(3, COLOR_BLACK, COLOR_CYAN);
-        init_pair(4, COLOR_WHITE, COLOR_BLUE);
-        init_pair(5, COLOR_BLUE, -1);
-        init_pair(6, COLOR_GREEN, -1);
-        init_pair(7, COLOR_MAGENTA, -1);
-        init_pair(8, COLOR_RED, -1);
-        init_pair(9, COLOR_CYAN, -1);
+        init_pair(THEME_PAIR_CYAN, COLOR_CYAN, -1);
+        init_pair(THEME_PAIR_NORMAL, COLOR_WHITE, -1);
+        init_pair(THEME_PAIR_ACTIVE, COLOR_BLACK, COLOR_CYAN);
+        init_pair(THEME_PAIR_PROMPT, COLOR_WHITE, COLOR_BLUE);
+        init_pair(THEME_PAIR_DIRECTORY, COLOR_BLUE, -1);
+        init_pair(THEME_PAIR_EXECUTABLE, COLOR_GREEN, -1);
+        init_pair(THEME_PAIR_IMAGE, COLOR_MAGENTA, -1);
+        init_pair(THEME_PAIR_ARCHIVE, COLOR_RED, -1);
+        init_pair(THEME_PAIR_SYMLINK, COLOR_CYAN, -1);
     }
 }
 
@@ -41,9 +41,9 @@ void ui_render_filter_prompt(const char *query) {
     int max_y, max_x;
     getmaxyx(stdscr, max_y, max_x);
     mvhline(max_y - 2, 0, ' ', max_x);
-    attron(COLOR_PAIR(4));
+    attron(COLOR_PAIR(THEME_PAIR_PROMPT));
     mvprintw(max_y - 2, 0, "Filter: [%s]_", query);
-    attroff(COLOR_PAIR(4));
+    attroff(COLOR_PAIR(THEME_PAIR_PROMPT));
     move(max_y - 2, 9 + (int)strlen(query));
     refresh();
 }
@@ -59,9 +59,9 @@ bool ui_prompt(const char *prompt, char *buffer, size_t buf_size) {
     
     int prompt_y = max_y - 2;
     mvhline(prompt_y, 0, ' ', max_x);
-    attron(COLOR_PAIR(4));
+    attron(COLOR_PAIR(THEME_PAIR_PROMPT));
     mvprintw(prompt_y, 0, "%s", prompt);
-    attroff(COLOR_PAIR(4));
+    attroff(COLOR_PAIR(THEME_PAIR_PROMPT));
     
     echo();
     curs_set(1);
@@ -178,7 +178,8 @@ static void draw_pane(const Pane *pane, bool active) {
     int content_width = pane->width - 2;
 
     if (pane->width < 4 || pane->height < 3) return;
-    attron(active ? (COLOR_PAIR(3) | A_BOLD) : COLOR_PAIR(2));
+    attron(active ? (COLOR_PAIR(THEME_PAIR_ACTIVE) | A_BOLD) :
+                    COLOR_PAIR(THEME_PAIR_NORMAL));
     mvaddch(pane->y, pane->x, ACS_ULCORNER);
     mvaddch(pane->y, pane->x + pane->width - 1, ACS_URCORNER);
     mvaddch(pane->y + pane->height - 1, pane->x, ACS_LLCORNER);
@@ -187,7 +188,8 @@ static void draw_pane(const Pane *pane, bool active) {
     mvhline(pane->y + pane->height - 1, pane->x + 1, ACS_HLINE, pane->width - 2);
     mvvline(pane->y + 1, pane->x, ACS_VLINE, pane->height - 2);
     mvvline(pane->y + 1, pane->x + pane->width - 1, ACS_VLINE, pane->height - 2);
-    attroff(active ? (COLOR_PAIR(3) | A_BOLD) : COLOR_PAIR(2));
+    attroff(active ? (COLOR_PAIR(THEME_PAIR_ACTIVE) | A_BOLD) :
+                    COLOR_PAIR(THEME_PAIR_NORMAL));
 
     for (int row = 0; row < list_height &&
                        row + pane->state.scroll_offset < visible_count; ++row) {
@@ -198,9 +200,10 @@ static void draw_pane(const Pane *pane, bool active) {
         bool cursor = original_index == pane->state.selected_index;
         FileTheme theme = get_file_color_and_icon(entry->mode,
                               file_extension(entry->name));
-        attr_t attributes = cursor ? (COLOR_PAIR(3) | A_BOLD) :
+        attr_t attributes = cursor ? (COLOR_PAIR(THEME_PAIR_ACTIVE) | A_BOLD) :
                     (COLOR_PAIR(theme.color_pair) |
-                     (entry->is_dir || theme.color_pair == 6 ? A_BOLD : 0));
+                 (entry->is_dir || theme.color_pair == THEME_PAIR_EXECUTABLE ?
+                  A_BOLD : 0));
         char line[PATH_MAX];
 
         snprintf(line, sizeof(line), "%c%s %s", entry->is_selected ? '*' : ' ',
@@ -210,10 +213,12 @@ static void draw_pane(const Pane *pane, bool active) {
         safe_draw_line(screen_y, pane->x + 1, line, content_width);
         attroff(attributes);
     }
-    attron(active ? (COLOR_PAIR(3) | A_BOLD) : COLOR_PAIR(2));
+    attron(active ? (COLOR_PAIR(THEME_PAIR_ACTIVE) | A_BOLD) :
+                    COLOR_PAIR(THEME_PAIR_NORMAL));
     safe_draw_line(pane->y + pane->height - 1, pane->x + 2,
                    pane->state.current_path, pane->width - 4);
-    attroff(active ? (COLOR_PAIR(3) | A_BOLD) : COLOR_PAIR(2));
+    attroff(active ? (COLOR_PAIR(THEME_PAIR_ACTIVE) | A_BOLD) :
+                    COLOR_PAIR(THEME_PAIR_NORMAL));
 }
 
 void ui_dual_init(DualPaneUI *ui) {
