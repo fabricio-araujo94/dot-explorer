@@ -107,15 +107,15 @@ void ui_show_message(const char *title, const char *message) {
 
     mvwaddnstr(win, 0, 2, safe_title, box_w - 4);
 
-    int m_y = 2;
+    int line_y = 2;
     char *msg_copy = strdup(safe_message);
     if (!msg_copy) {
         delwin(win);
         return;
     }
     char *line = strtok(msg_copy, "\n");
-    while (line != NULL && m_y < box_h - 2) {
-        mvwaddnstr(win, m_y++, 2, line, box_w - 4);
+    while (line != NULL && line_y < box_h - 2) {
+        mvwaddnstr(win, line_y++, 2, line, box_w - 4);
         line = strtok(NULL, "\n");
     }
     free(msg_copy);
@@ -377,7 +377,7 @@ void ui_handle_input(DualPaneUI *ui, int ch) {
             char destination[PATH_MAX];
             const char *source = ui->clipboard.paths[0];
             const char *name = path_basename(source);
-            if (utils_join_path(destination, sizeof(destination),
+            if (path_join(destination, sizeof(destination),
                                 active->state.current_path, name) &&
                 task_start_copy(&ui->task, source, destination)) {
                 ui->task_destination_pane = ui->active_pane_index;
