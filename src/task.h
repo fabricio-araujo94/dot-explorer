@@ -22,7 +22,7 @@ typedef struct {
     uint64_t current_file_bytes;
     uint64_t total_bytes;
     bool cancel_requested;
-    bool thread_started;
+    bool thread_joinable;
     char source[PATH_MAX];
     char destination[PATH_MAX];
     char error_path[PATH_MAX];

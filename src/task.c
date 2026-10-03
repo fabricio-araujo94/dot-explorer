@@ -98,7 +98,7 @@ void task_reap(Task *task) {
 
     if (!task) return;
     pthread_mutex_lock(&task->mutex);
-    if (!task->thread_started) {
+    if (!task->thread_joinable) {
         pthread_mutex_unlock(&task->mutex);
         return;
     }
@@ -108,8 +108,8 @@ void task_reap(Task *task) {
     pthread_join(thread, NULL);
 
     pthread_mutex_lock(&task->mutex);
-    if (task->thread_started && pthread_equal(task->thread, thread)) {
-        task->thread_started = false;
+    if (task->thread_joinable && pthread_equal(task->thread, thread)) {
+        task->thread_joinable = false;
     }
     pthread_mutex_unlock(&task->mutex);
 }
@@ -126,7 +126,7 @@ bool task_start_copy(Task *task, const char *source, const char *destination) {
     }
 
     pthread_mutex_lock(&task->mutex);
-    previous_thread = task->thread_started;
+    previous_thread = task->thread_joinable;
     bool running = task->status == TASK_RUNNING;
     pthread_mutex_unlock(&task->mutex);
     if (running) {
@@ -154,7 +154,7 @@ bool task_start_copy(Task *task, const char *source, const char *destination) {
         return false;
     }
     pthread_mutex_lock(&task->mutex);
-    task->thread_started = true;
+    task->thread_joinable = true;
     pthread_mutex_unlock(&task->mutex);
     return true;
 }

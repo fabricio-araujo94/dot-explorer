@@ -51,8 +51,8 @@ static void test_task_copy_file_and_directory(void) {
     setup_task_env();
 
     /* 1. Test single file async copy */
-    assert(utils_join_path(src_file, sizeof(src_file), TEST_TASK_ROOT, "single_src.txt"));
-    assert(utils_join_path(dst_file, sizeof(dst_file), TEST_TASK_ROOT, "single_dst.txt"));
+    assert(path_join(src_file, sizeof(src_file), TEST_TASK_ROOT, "single_src.txt"));
+    assert(path_join(dst_file, sizeof(dst_file), TEST_TASK_ROOT, "single_dst.txt"));
     write_dummy_file(src_file, "Single file content to copy via background worker");
 
     task_init(&task);
@@ -68,12 +68,12 @@ static void test_task_copy_file_and_directory(void) {
     task_cleanup(&task);
 
     /* 2. Test directory tree async copy */
-    assert(utils_join_path(src_dir, sizeof(src_dir), TEST_TASK_ROOT, "source_tree"));
-    assert(utils_join_path(dst_dir, sizeof(dst_dir), TEST_TASK_ROOT, "dest_tree"));
+    assert(path_join(src_dir, sizeof(src_dir), TEST_TASK_ROOT, "source_tree"));
+    assert(path_join(dst_dir, sizeof(dst_dir), TEST_TASK_ROOT, "dest_tree"));
     assert(platform_mkdir(src_dir, 0700) == 0);
 
-    assert(utils_join_path(file1, sizeof(file1), src_dir, "f1.txt"));
-    assert(utils_join_path(file2, sizeof(file2), src_dir, "f2.txt"));
+    assert(path_join(file1, sizeof(file1), src_dir, "f1.txt"));
+    assert(path_join(file2, sizeof(file2), src_dir, "f2.txt"));
     write_dummy_file(file1, "Hello World from File 1");
     write_dummy_file(file2, "Another File with Content 2");
 
@@ -92,8 +92,8 @@ static void test_task_copy_file_and_directory(void) {
 
     /* Verify files exist in dest_tree */
     char check1[PATH_MAX], check2[PATH_MAX];
-    assert(utils_join_path(check1, sizeof(check1), dst_dir, "f1.txt"));
-    assert(utils_join_path(check2, sizeof(check2), dst_dir, "f2.txt"));
+    assert(path_join(check1, sizeof(check1), dst_dir, "f1.txt"));
+    assert(path_join(check2, sizeof(check2), dst_dir, "f2.txt"));
     assert(access(check1, F_OK) == 0);
     assert(access(check2, F_OK) == 0);
 
@@ -111,14 +111,14 @@ static void test_task_copy_multifile_progress(void) {
     char error_path[PATH_MAX];
 
     setup_task_env();
-    assert(utils_join_path(src_dir, sizeof(src_dir), TEST_TASK_ROOT, "multi_src"));
-    assert(utils_join_path(dst_dir, sizeof(dst_dir), TEST_TASK_ROOT, "multi_dst"));
+    assert(path_join(src_dir, sizeof(src_dir), TEST_TASK_ROOT, "multi_src"));
+    assert(path_join(dst_dir, sizeof(dst_dir), TEST_TASK_ROOT, "multi_dst"));
     assert(platform_mkdir(src_dir, 0700) == 0);
 
-    assert(utils_join_path(f_small, sizeof(f_small), src_dir, "small.txt"));
-    assert(utils_join_path(f_large, sizeof(f_large), src_dir, "large.bin"));
-    assert(utils_join_path(f_small2, sizeof(f_small2), src_dir, "small2.txt"));
-    assert(utils_join_path(f_empty, sizeof(f_empty), src_dir, "empty.txt"));
+    assert(path_join(f_small, sizeof(f_small), src_dir, "small.txt"));
+    assert(path_join(f_large, sizeof(f_large), src_dir, "large.bin"));
+    assert(path_join(f_small2, sizeof(f_small2), src_dir, "small2.txt"));
+    assert(path_join(f_empty, sizeof(f_empty), src_dir, "empty.txt"));
 
     write_dummy_file(f_small, "small file with 24 bytes");
     memset(large_buf, 'A', sizeof(large_buf));
@@ -152,15 +152,15 @@ static void test_task_cancellation(void) {
     char error_path[PATH_MAX];
 
     setup_task_env();
-    assert(utils_join_path(src_dir, sizeof(src_dir), TEST_TASK_ROOT, "big_source"));
-    assert(utils_join_path(dst_dir, sizeof(dst_dir), TEST_TASK_ROOT, "big_dest"));
+    assert(path_join(src_dir, sizeof(src_dir), TEST_TASK_ROOT, "big_source"));
+    assert(path_join(dst_dir, sizeof(dst_dir), TEST_TASK_ROOT, "big_dest"));
     assert(platform_mkdir(src_dir, 0700) == 0);
 
     /* Create 200 files with some content to allow cancellation window */
     for (int i = 0; i < 200; ++i) {
         char fn[64], fp[PATH_MAX];
         snprintf(fn, sizeof(fn), "data_%03d.bin", i);
-        assert(utils_join_path(fp, sizeof(fp), src_dir, fn));
+        assert(path_join(fp, sizeof(fp), src_dir, fn));
         write_dummy_file(fp, "some dummy bytes to copy........................................");
     }
 
@@ -182,9 +182,9 @@ static void test_task_invalid_inputs(void) {
     char temp_dir[PATH_MAX];
     task_init(&task);
     assert(test_get_temp_dir(temp_dir, sizeof(temp_dir), NULL));
-    assert(utils_join_path(missing_source, sizeof(missing_source), temp_dir,
+    assert(path_join(missing_source, sizeof(missing_source), temp_dir,
                            "dot-explorer-missing-source"));
-    assert(utils_join_path(missing_destination, sizeof(missing_destination), temp_dir,
+    assert(path_join(missing_destination, sizeof(missing_destination), temp_dir,
                            "dot-explorer-missing-destination"));
 
     /* Invalid arguments */
