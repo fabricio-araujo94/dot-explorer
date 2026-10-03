@@ -30,7 +30,7 @@ typedef struct {
     int *indices;
     size_t count;
     size_t capacity;
-} EntryList;
+} FilteredIndexList;
 
 typedef struct {
     char current_path[PATH_MAX];
@@ -39,7 +39,7 @@ typedef struct {
     int scroll_offset;
     bool should_quit;
     SortType sort_type;
-    EntryList filtered_entries;
+    FilteredIndexList filtered_entries;
     bool filter_active;
     char filter_query[256];
 
@@ -49,8 +49,8 @@ typedef struct {
 void state_init(AppState *state);
 void state_cleanup(AppState *state);
 bool state_change_dir(AppState *state, const char *new_path);
-void entry_list_clear(EntryList *list);
-bool filter_entries(const char *query, const DirectoryList *source, EntryList *list);
+void filtered_index_list_clear(FilteredIndexList *list);
+bool filter_entries(const char *query, const DirectoryList *source, FilteredIndexList *list);
 size_t state_visible_count(const AppState *state);
 int state_visible_index(const AppState *state, int view_index);
 bool clipboard_add_entry(Clipboard *clipboard, const char *path);

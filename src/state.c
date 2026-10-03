@@ -8,7 +8,7 @@
 #include <ctype.h>
 #include <limits.h>
 
-void entry_list_clear(EntryList *list) {
+void filtered_index_list_clear(FilteredIndexList *list) {
     if (!list) return;
     free(list->indices);
     list->indices = NULL;
@@ -26,7 +26,7 @@ static bool fuzzy_match(const char *name, const char *query) {
     return *query == '\0';
 }
 
-bool filter_entries(const char *query, const DirectoryList *source, EntryList *list) {
+bool filter_entries(const char *query, const DirectoryList *source, FilteredIndexList *list) {
     if (!query || !source || !list) {
         errno = EINVAL;
         return false;
@@ -270,7 +270,7 @@ bool clipboard_apply_operation(Clipboard *clipboard, const char *destination_dir
         const char *name = path_basename(source);
         char destination[PATH_MAX];
 
-        if (!utils_join_path(destination, sizeof(destination), destination_dir, name)) {
+        if (!path_join(destination, sizeof(destination), destination_dir, name)) {
             set_error_path(error_path, error_path_size, source);
             return false;
         }
@@ -324,7 +324,7 @@ void state_init(AppState *state) {
 }
 
 void state_cleanup(AppState *state) {
-    entry_list_clear(&state->filtered_entries);
+    filtered_index_list_clear(&state->filtered_entries);
     history_clear_stack(&state->history.back, &state->history.back_count,
                         &state->history.back_capacity);
     history_clear_stack(&state->history.forward, &state->history.forward_count,
@@ -345,10 +345,10 @@ bool state_change_dir(AppState *state, const char *new_path) {
         saved_selected_name[sizeof(saved_selected_name) - 1] = '\0';
     }
 
-    if (is_absolute_path(new_path)) {
+    if (path_is_absolute(new_path)) {
         strncpy(target_path, new_path, sizeof(target_path) - 1);
     } else {
-        if (!utils_join_path(target_path, sizeof(target_path), state->current_path, new_path)) {
+        if (!path_join(target_path, sizeof(target_path), state->current_path, new_path)) {
             return false;
         }
     }
@@ -400,7 +400,7 @@ bool state_change_dir(AppState *state, const char *new_path) {
         }
         state->filter_active = false;
         state->filter_query[0] = '\0';
-        entry_list_clear(&state->filtered_entries);
+        filtered_index_list_clear(&state->filtered_entries);
         return true;
     } else {
         fs_free_dir_list(&new_list);

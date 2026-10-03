@@ -53,9 +53,9 @@ static void test_fuzzy_filtering(void) {
     char file1[PATH_MAX], file2[PATH_MAX], file3[PATH_MAX];
 
     setup_state_env();
-    assert(utils_join_path(file1, sizeof(file1), TEST_STATE_ROOT, "config_prod.json"));
-    assert(utils_join_path(file2, sizeof(file2), TEST_STATE_ROOT, "config_dev.json"));
-    assert(utils_join_path(file3, sizeof(file3), TEST_STATE_ROOT, "document.pdf"));
+    assert(path_join(file1, sizeof(file1), TEST_STATE_ROOT, "config_prod.json"));
+    assert(path_join(file2, sizeof(file2), TEST_STATE_ROOT, "config_dev.json"));
+    assert(path_join(file3, sizeof(file3), TEST_STATE_ROOT, "document.pdf"));
     write_dummy_file(file1, "{}");
     write_dummy_file(file2, "{}");
     write_dummy_file(file3, "%PDF");
@@ -156,7 +156,7 @@ static void test_clipboard_lifecycle_and_errors(void) {
     char error_path[PATH_MAX];
 
     setup_state_env();
-    assert(utils_join_path(file1, sizeof(file1), TEST_STATE_ROOT, "clip_test.txt"));
+    assert(path_join(file1, sizeof(file1), TEST_STATE_ROOT, "clip_test.txt"));
     write_dummy_file(file1, "sample");
 
     /* Add entry */
@@ -202,16 +202,16 @@ static void test_clipboard_cut_partial_failure(void) {
     char missing_path[PATH_MAX];
 
     setup_state_env();
-    assert(utils_join_path(first, sizeof(first), TEST_STATE_ROOT, "first.txt"));
-    assert(utils_join_path(second, sizeof(second), TEST_STATE_ROOT, "second.txt"));
-    assert(utils_join_path(destination_dir, sizeof(destination_dir), TEST_STATE_ROOT, "destination"));
-    assert(utils_join_path(moved_path, sizeof(moved_path), destination_dir, "first.txt"));
+    assert(path_join(first, sizeof(first), TEST_STATE_ROOT, "first.txt"));
+    assert(path_join(second, sizeof(second), TEST_STATE_ROOT, "second.txt"));
+    assert(path_join(destination_dir, sizeof(destination_dir), TEST_STATE_ROOT, "destination"));
+    assert(path_join(moved_path, sizeof(moved_path), destination_dir, "first.txt"));
     write_dummy_file(first, "first");
     write_dummy_file(second, "second");
     assert(platform_mkdir(destination_dir, 0700) == 0);
     assert(clipboard_add_entry(&cb, first));
     assert(clipboard_add_entry(&cb, second));
-    assert(utils_join_path(missing_path, sizeof(missing_path), TEST_STATE_ROOT,
+    assert(path_join(missing_path, sizeof(missing_path), TEST_STATE_ROOT,
                            "missing.txt"));
     free(cb.paths[1]);
     cb.paths[1] = strdup(missing_path);
