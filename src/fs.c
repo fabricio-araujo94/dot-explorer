@@ -124,7 +124,7 @@ static bool remove_tree(const char *path, char *error_path, size_t error_path_si
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
-        if (!utils_join_path(child, sizeof(child), path, entry->d_name) ||
+        if (!path_join(child, sizeof(child), path, entry->d_name) ||
             !remove_tree(child, error_path, error_path_size)) {
             closedir(dir);
             return false;
@@ -288,8 +288,8 @@ static bool copy_tree(const char *src_path, const char *dest_path,
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
                 continue;
             }
-            if (!utils_join_path(source_child, sizeof(source_child), src_path, entry->d_name) ||
-                !utils_join_path(dest_child, sizeof(dest_child), dest_path, entry->d_name) ||
+            if (!path_join(source_child, sizeof(source_child), src_path, entry->d_name) ||
+                !path_join(dest_child, sizeof(dest_child), dest_path, entry->d_name) ||
                 !copy_tree(source_child, dest_child, options, error_path, error_path_size,
                             depth + 1)) {
                 closedir(dir);
@@ -432,7 +432,7 @@ bool fs_read_dir(const char *path, DirectoryList *list) {
         entry->name[sizeof(entry->name) - 1] = '\0';
         entry->is_selected = false;
 
-        if (!utils_join_path(full_path, sizeof(full_path), path, dp->d_name)) {
+        if (!path_join(full_path, sizeof(full_path), path, dp->d_name)) {
             closedir(dir);
             return false;
         }

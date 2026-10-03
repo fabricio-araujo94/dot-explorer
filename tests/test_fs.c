@@ -25,7 +25,7 @@ static void teardown(void) {
 }
 
 static void make_path(char *buffer, size_t size, const char *name) {
-    assert(utils_join_path(buffer, size, TEST_ROOT, name));
+    assert(path_join(buffer, size, TEST_ROOT, name));
 }
 
 static void write_file(const char *path, const char *contents) {
@@ -133,13 +133,13 @@ static void test_clipboard_apply_between_directories(void) {
     make_path(destination_dir, sizeof(destination_dir), "destination");
     assert(platform_mkdir(source_dir, 0700) == 0);
     assert(platform_mkdir(destination_dir, 0700) == 0);
-    assert(utils_join_path(source_file, sizeof(source_file), source_dir, "item.txt"));
+    assert(path_join(source_file, sizeof(source_file), source_dir, "item.txt"));
     write_file(source_file, "clipboard");
     assert(clipboard_add_entry(&clipboard, source_file));
     assert(!clipboard.is_cut);
     assert(clipboard_apply_operation(&clipboard, destination_dir,
                                      error_path, sizeof(error_path)));
-    assert(utils_join_path(copied_file, sizeof(copied_file), destination_dir, "item.txt"));
+    assert(path_join(copied_file, sizeof(copied_file), destination_dir, "item.txt"));
     file = fopen(copied_file, "rb");
     assert(file != NULL);
     fclose(file);
@@ -161,13 +161,13 @@ static void test_clipboard_cut_same_filesystem(void) {
     make_path(destination_dir, sizeof(destination_dir), "cut-destination");
     assert(platform_mkdir(source_dir, 0700) == 0);
     assert(platform_mkdir(destination_dir, 0700) == 0);
-    assert(utils_join_path(source_file, sizeof(source_file), source_dir, "item.txt"));
+    assert(path_join(source_file, sizeof(source_file), source_dir, "item.txt"));
     write_file(source_file, "move");
     assert(clipboard_add_entry(&clipboard, source_file));
     clipboard.is_cut = true;
     assert(clipboard_apply_operation(&clipboard, destination_dir,
                                      error_path, sizeof(error_path)));
-    assert(utils_join_path(moved_file, sizeof(moved_file), destination_dir, "item.txt"));
+    assert(path_join(moved_file, sizeof(moved_file), destination_dir, "item.txt"));
     assert(access(moved_file, F_OK) == 0);
     assert(access(source_file, F_OK) != 0);
     assert(clipboard.count == 0);
@@ -211,7 +211,7 @@ static void test_path_near_path_max(void) {
     }
     base[length] = '\0';
     errno = 0;
-    assert(!utils_join_path(result, sizeof(result), base, "file"));
+    assert(!path_join(result, sizeof(result), base, "file"));
     assert(errno == ENAMETOOLONG);
     teardown();
 }
@@ -256,11 +256,11 @@ static void test_copy_readonly_directory(void) {
     make_path(src_dir, sizeof(src_dir), "readonly_dir");
     make_path(dst_dir, sizeof(dst_dir), "readonly_copy");
     assert(platform_mkdir(src_dir, 0700) == 0);
-    assert(utils_join_path(src_file, sizeof(src_file), src_dir, "data.txt"));
+    assert(path_join(src_file, sizeof(src_file), src_dir, "data.txt"));
     write_file(src_file, "read-only file copy test data");
     assert(SetFileAttributesA(src_file, FILE_ATTRIBUTE_READONLY));
     assert(fs_copy_recursive(src_dir, dst_dir));
-    assert(utils_join_path(dst_file, sizeof(dst_file), dst_dir, "data.txt"));
+    assert(path_join(dst_file, sizeof(dst_file), dst_dir, "data.txt"));
     assert(access(dst_file, F_OK) == 0);
     destination_attributes = GetFileAttributesA(dst_file);
     assert(destination_attributes != INVALID_FILE_ATTRIBUTES);
@@ -275,7 +275,7 @@ static void test_copy_readonly_directory(void) {
     make_path(src_dir, sizeof(src_dir), "readonly_dir");
     make_path(dst_dir, sizeof(dst_dir), "readonly_copy");
     assert(platform_mkdir(src_dir, 0700) == 0);
-    assert(utils_join_path(src_file, sizeof(src_file), src_dir, "data.txt"));
+    assert(path_join(src_file, sizeof(src_file), src_dir, "data.txt"));
     write_file(src_file, "read-only directory test data");
 
     /* Set source directory permissions to read-only for owner (0555) */
@@ -285,7 +285,7 @@ static void test_copy_readonly_directory(void) {
     assert(fs_copy_recursive(src_dir, dst_dir));
 
     /* Check destination file exists and matches */
-    assert(utils_join_path(dst_file, sizeof(dst_file), dst_dir, "data.txt"));
+    assert(path_join(dst_file, sizeof(dst_file), dst_dir, "data.txt"));
     assert(access(dst_file, F_OK) == 0);
 
     /* Check destination directory permissions preserved final mode (0555) */
@@ -405,7 +405,7 @@ static void test_large_dir_expansion(void) {
     for (int i = 0; i < 300; ++i) {
         char filename[64];
         snprintf(filename, sizeof(filename), "file_%04d.txt", i);
-        assert(utils_join_path(file_path, sizeof(file_path), dir, filename));
+        assert(path_join(file_path, sizeof(file_path), dir, filename));
         write_file(file_path, "x");
     }
 

@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-void format_size(size_t size, char *buf, size_t buf_size) {
+void utils_format_size(size_t size, char *buf, size_t buf_size) {
     const char *units[] = {"B", "KB", "MB", "GB", "TB"};
     int unit = 0;
     double dsize = size;
@@ -51,14 +51,14 @@ const char *path_basename(const char *path) {
     return separator ? separator + 1 : path;
 }
 
-bool is_absolute_path(const char *path) {
+bool path_is_absolute(const char *path) {
     if (!path || !*path) return false;
     if (path[0] == '/' || path[0] == '\\') return true;
     return isalpha((unsigned char)path[0]) && path[1] == ':' &&
            (path[2] == '/' || path[2] == '\\');
 }
 
-bool utils_join_path(char *buffer, size_t size, const char *base, const char *name) {
+bool path_join(char *buffer, size_t size, const char *base, const char *name) {
         const char separator = PLATFORM_PATH_SEPARATOR;
     size_t base_length;
     size_t name_start = 0;

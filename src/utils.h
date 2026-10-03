@@ -5,11 +5,11 @@
 #include <stdbool.h>
 #include "utils/platform.h"
 
-void format_size(size_t size, char *buf, size_t buf_size);
+void utils_format_size(size_t size, char *buf, size_t buf_size);
 bool set_error_path(char *error_path, size_t error_path_size, const char *path);
 const char *path_find_last_separator(const char *path);
 const char *path_basename(const char *path);
-bool is_absolute_path(const char *path);
-bool utils_join_path(char *buffer, size_t size, const char *base, const char *name);
+bool path_is_absolute(const char *path);
+bool path_join(char *buffer, size_t size, const char *base, const char *name);
 
 #endif // UTILS_H

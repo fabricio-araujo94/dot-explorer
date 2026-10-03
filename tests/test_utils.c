@@ -7,25 +7,25 @@
 #include <string.h>
 #include <sys/stat.h>
 
-static void test_format_size(void) {
+static void test_utils_format_size(void) {
     char buf[64];
 
-    format_size(0, buf, sizeof(buf));
+    utils_format_size(0, buf, sizeof(buf));
     assert(strcmp(buf, "0 B") == 0);
 
-    format_size(500, buf, sizeof(buf));
+    utils_format_size(500, buf, sizeof(buf));
     assert(strcmp(buf, "500 B") == 0);
 
-    format_size(1024, buf, sizeof(buf));
+    utils_format_size(1024, buf, sizeof(buf));
     assert(strcmp(buf, "1.0 KB") == 0);
 
-    format_size(1536, buf, sizeof(buf));
+    utils_format_size(1536, buf, sizeof(buf));
     assert(strcmp(buf, "1.5 KB") == 0);
 
-    format_size(1024 * 1024, buf, sizeof(buf));
+    utils_format_size(1024 * 1024, buf, sizeof(buf));
     assert(strcmp(buf, "1.0 MB") == 0);
 
-    format_size(1024ULL * 1024 * 1024 * 5, buf, sizeof(buf));
+    utils_format_size(1024ULL * 1024 * 1024 * 5, buf, sizeof(buf));
     assert(strcmp(buf, "5.0 GB") == 0);
 }
 
@@ -44,40 +44,40 @@ static void test_set_error_path(void) {
     assert(buffer[3] == '\0');
 }
 
-static void test_utils_join_path(void) {
+static void test_path_join(void) {
     char result[PATH_MAX];
 
     /* Standard join */
-    assert(utils_join_path(result, sizeof(result), "/tmp", "file.txt"));
+    assert(path_join(result, sizeof(result), "/tmp", "file.txt"));
     assert(strcmp(result, "/tmp/file.txt") == 0);
 
     /* Base ending with slash */
-    assert(utils_join_path(result, sizeof(result), "/tmp/", "file.txt"));
+    assert(path_join(result, sizeof(result), "/tmp/", "file.txt"));
     assert(strcmp(result, "/tmp/file.txt") == 0);
 
     /* Name starting with slash */
-    assert(utils_join_path(result, sizeof(result), "/tmp", "/file.txt"));
+    assert(path_join(result, sizeof(result), "/tmp", "/file.txt"));
     assert(strcmp(result, "/tmp/file.txt") == 0);
 
     /* Base empty */
-    assert(utils_join_path(result, sizeof(result), "", "file.txt"));
+    assert(path_join(result, sizeof(result), "", "file.txt"));
     assert(strcmp(result, "file.txt") == 0);
 
     /* Null checks & invalid arguments */
     errno = 0;
-    assert(!utils_join_path(NULL, sizeof(result), "/tmp", "file.txt"));
+    assert(!path_join(NULL, sizeof(result), "/tmp", "file.txt"));
     assert(errno == EINVAL);
-    assert(!utils_join_path(result, 0, "/tmp", "file.txt"));
+    assert(!path_join(result, 0, "/tmp", "file.txt"));
     assert(errno == EINVAL);
-    assert(!utils_join_path(result, sizeof(result), NULL, "file.txt"));
+    assert(!path_join(result, sizeof(result), NULL, "file.txt"));
     assert(errno == EINVAL);
-    assert(!utils_join_path(result, sizeof(result), "/tmp", NULL));
+    assert(!path_join(result, sizeof(result), "/tmp", NULL));
     assert(errno == EINVAL);
 
     /* Small buffer overflow check */
     char small_buf[8];
     errno = 0;
-    assert(!utils_join_path(small_buf, sizeof(small_buf), "/tmp", "very_long_file_name.txt"));
+    assert(!path_join(small_buf, sizeof(small_buf), "/tmp", "very_long_file_name.txt"));
     assert(errno == ENAMETOOLONG);
 }
 
@@ -95,14 +95,14 @@ static void test_path_find_last_separator(void) {
     assert(path_find_last_separator(NULL) == NULL);
 }
 
-static void test_is_absolute_path(void) {
-    assert(is_absolute_path("/tmp/file.txt"));
-    assert(is_absolute_path("\\\\server\\share\\file.txt"));
-    assert(is_absolute_path("C:\\tmp\\file.txt"));
-    assert(is_absolute_path("D:/tmp/file.txt"));
-    assert(!is_absolute_path("C:file.txt"));
-    assert(!is_absolute_path("relative/file.txt"));
-    assert(!is_absolute_path(NULL));
+static void test_path_is_absolute(void) {
+    assert(path_is_absolute("/tmp/file.txt"));
+    assert(path_is_absolute("\\\\server\\share\\file.txt"));
+    assert(path_is_absolute("C:\\tmp\\file.txt"));
+    assert(path_is_absolute("D:/tmp/file.txt"));
+    assert(!path_is_absolute("C:file.txt"));
+    assert(!path_is_absolute("relative/file.txt"));
+    assert(!path_is_absolute(NULL));
 }
 
 static void test_platform_realpath_and_mkdir(void) {
@@ -156,12 +156,12 @@ static void test_theme_and_icons(void) {
 }
 
 int main(void) {
-    test_format_size();
+    test_utils_format_size();
     test_set_error_path();
-    test_utils_join_path();
+    test_path_join();
     test_path_basename();
     test_path_find_last_separator();
-    test_is_absolute_path();
+    test_path_is_absolute();
     test_platform_realpath_and_mkdir();
     test_theme_and_icons();
     puts("test_utils: all tests passed");

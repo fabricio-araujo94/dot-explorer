@@ -122,7 +122,7 @@ static void filter_prompt(AppState *state, const InputCallbacks *cb) {
         if (ch == 27 || ch == -1) { /* 27 = ESC */
             state->filter_active = false;
             state->filter_query[0] = '\0';
-            entry_list_clear(&state->filtered_entries);
+            filtered_index_list_clear(&state->filtered_entries);
             break;
         }
         if (ch == '\n' || ch == 10 || ch == 13 || ch == KEY_ENTER) break;
@@ -143,7 +143,7 @@ static void filter_prompt(AppState *state, const InputCallbacks *cb) {
     }
     if (state->filter_query[0] == '\0') {
         state->filter_active = false;
-        entry_list_clear(&state->filtered_entries);
+        filtered_index_list_clear(&state->filtered_entries);
     }
     if (cb->set_cursor) cb->set_cursor(0, cb->userdata);
 }
@@ -171,7 +171,7 @@ static bool capture_clipboard(AppState *state, Clipboard *clipboard, bool is_cut
         if (is_navigation_entry(&state->dir_list.entries[i])) {
             continue;
         }
-        if (!utils_join_path(path, sizeof(path), state->current_path,
+        if (!path_join(path, sizeof(path), state->current_path,
                              state->dir_list.entries[i].name) ||
             !clipboard_add_entry(clipboard, path)) {
             clipboard_clear(clipboard);
@@ -233,7 +233,7 @@ static void handle_enter_action(AppState *state, Clipboard *clipboard, const Inp
         }
     } else {
         char path[PATH_MAX];
-        if (utils_join_path(path, sizeof(path), state->current_path, entry->name) &&
+        if (path_join(path, sizeof(path), state->current_path, entry->name) &&
             !cb_open_file(callbacks, path)) {
             char message[PATH_MAX + 64];
             snprintf(message, sizeof(message), "%s: %s", path, strerror(errno));
@@ -308,7 +308,7 @@ static void handle_delete_selected_items(AppState *state, const InputCallbacks *
             FileEntry *entry = &state->dir_list.entries[i];
             if (entry->is_selected && !is_navigation_entry(entry)) {
                 char full_path[PATH_MAX];
-                utils_join_path(full_path, sizeof(full_path), state->current_path, entry->name);
+                path_join(full_path, sizeof(full_path), state->current_path, entry->name);
                 if (!fs_delete(full_path)) {
                     any_fail = true;
                     snprintf(fail_msg, sizeof(fail_msg), "%s: %s", entry->name, strerror(errno));
@@ -331,7 +331,7 @@ static void handle_delete_single_item(AppState *state, const InputCallbacks *cal
     char buf[256];
     if (cb_prompt(callbacks, "Delete item? (y/n): ", buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
         char full_path[PATH_MAX];
-        utils_join_path(full_path, sizeof(full_path), state->current_path, entry->name);
+        path_join(full_path, sizeof(full_path), state->current_path, entry->name);
         if (!fs_delete(full_path)) {
             char msg[PATH_MAX + 64];
             snprintf(msg, sizeof(msg), "%s: %s", entry->name, strerror(errno));
@@ -375,8 +375,8 @@ static void handle_rename_action(AppState *state, Clipboard *clipboard, const In
     }
     if (cb_prompt(callbacks, "New name: ", new_name, sizeof(new_name))) {
         char old_path[PATH_MAX], new_path[PATH_MAX];
-        utils_join_path(old_path, sizeof(old_path), state->current_path, entry->name);
-        utils_join_path(new_path, sizeof(new_path), state->current_path, new_name);
+        path_join(old_path, sizeof(old_path), state->current_path, entry->name);
+        path_join(new_path, sizeof(new_path), state->current_path, new_name);
         if (!fs_rename(old_path, new_path)) {
             char msg[PATH_MAX + 64];
             snprintf(msg, sizeof(msg), "%s: %s", new_name, strerror(errno));
@@ -392,7 +392,7 @@ static void handle_create_file_action(AppState *state, Clipboard *clipboard, con
     char name[256];
     if (cb_prompt(callbacks, "New file name: ", name, sizeof(name))) {
         char full_path[PATH_MAX];
-        utils_join_path(full_path, sizeof(full_path), state->current_path, name);
+        path_join(full_path, sizeof(full_path), state->current_path, name);
         if (!fs_create_file(full_path)) {
             char msg[PATH_MAX + 64];
             snprintf(msg, sizeof(msg), "%s: %s", name, strerror(errno));
@@ -408,7 +408,7 @@ static void handle_create_dir_action(AppState *state, Clipboard *clipboard, cons
     char name[256];
     if (cb_prompt(callbacks, "New directory name: ", name, sizeof(name))) {
         char full_path[PATH_MAX];
-        utils_join_path(full_path, sizeof(full_path), state->current_path, name);
+        path_join(full_path, sizeof(full_path), state->current_path, name);
         if (!fs_create_dir(full_path)) {
             char msg[PATH_MAX + 64];
             snprintf(msg, sizeof(msg), "%s: %s", name, strerror(errno));
@@ -482,7 +482,7 @@ static void handle_properties_action(AppState *state, Clipboard *clipboard, cons
     }
     FileEntry *entry = &state->dir_list.entries[state->selected_index];
     char size_str[64];
-    format_size(entry->size, size_str, sizeof(size_str));
+    utils_format_size(entry->size, size_str, sizeof(size_str));
 
     char date_str[64];
     struct tm *tm_info = localtime(&entry->mtime);

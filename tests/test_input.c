@@ -137,9 +137,9 @@ static void test_navigation_and_selection(void) {
     char f1[PATH_MAX], f2[PATH_MAX], f3[PATH_MAX];
 
     setup_env();
-    utils_join_path(f1, sizeof(f1), TEST_INPUT_ROOT, "alpha.txt");
-    utils_join_path(f2, sizeof(f2), TEST_INPUT_ROOT, "beta.txt");
-    utils_join_path(f3, sizeof(f3), TEST_INPUT_ROOT, "gamma.txt");
+    path_join(f1, sizeof(f1), TEST_INPUT_ROOT, "alpha.txt");
+    path_join(f2, sizeof(f2), TEST_INPUT_ROOT, "beta.txt");
+    path_join(f3, sizeof(f3), TEST_INPUT_ROOT, "gamma.txt");
     write_file(f1, "1");
     write_file(f2, "22");
     write_file(f3, "333");
@@ -204,7 +204,7 @@ static void test_clipboard_copy_and_cut(void) {
     char f1[PATH_MAX];
 
     setup_env();
-    utils_join_path(f1, sizeof(f1), TEST_INPUT_ROOT, "sample.txt");
+    path_join(f1, sizeof(f1), TEST_INPUT_ROOT, "sample.txt");
     write_file(f1, "data");
 
     state_init(&state);
@@ -252,13 +252,13 @@ static void test_create_file_and_dir(void) {
     /* Create file */
     snprintf(ctx.prompt_response, sizeof(ctx.prompt_response), "newfile.txt");
     input_handle(&state, &cb, input_key_event(DOT_KEY_CREATE_FILE), &icb);
-    utils_join_path(expected_file, sizeof(expected_file), TEST_INPUT_ROOT, "newfile.txt");
+    path_join(expected_file, sizeof(expected_file), TEST_INPUT_ROOT, "newfile.txt");
     assert(access(expected_file, F_OK) == 0);
 
     /* Create directory */
     snprintf(ctx.prompt_response, sizeof(ctx.prompt_response), "newdir");
     input_handle(&state, &cb, input_key_event(DOT_KEY_CREATE_DIR), &icb);
-    utils_join_path(expected_dir, sizeof(expected_dir), TEST_INPUT_ROOT, "newdir");
+    path_join(expected_dir, sizeof(expected_dir), TEST_INPUT_ROOT, "newdir");
     assert(access(expected_dir, F_OK) == 0);
 
     state_cleanup(&state);
@@ -273,8 +273,8 @@ static void test_rename_and_delete(void) {
     char initial_path[PATH_MAX], renamed_path[PATH_MAX];
 
     setup_env();
-    utils_join_path(initial_path, sizeof(initial_path), TEST_INPUT_ROOT, "orig.txt");
-    utils_join_path(renamed_path, sizeof(renamed_path), TEST_INPUT_ROOT, "renamed.txt");
+    path_join(initial_path, sizeof(initial_path), TEST_INPUT_ROOT, "orig.txt");
+    path_join(renamed_path, sizeof(renamed_path), TEST_INPUT_ROOT, "renamed.txt");
     write_file(initial_path, "test");
 
     state_init(&state);
@@ -326,7 +326,7 @@ static void test_properties(void) {
     char f1[PATH_MAX];
 
     setup_env();
-    utils_join_path(f1, sizeof(f1), TEST_INPUT_ROOT, "props.txt");
+    path_join(f1, sizeof(f1), TEST_INPUT_ROOT, "props.txt");
     write_file(f1, "hello world");
 
     state_init(&state);
@@ -358,8 +358,8 @@ static void test_filter_prompt_interactive(void) {
     char f1[PATH_MAX], f2[PATH_MAX];
 
     setup_env();
-    utils_join_path(f1, sizeof(f1), TEST_INPUT_ROOT, "apple.txt");
-    utils_join_path(f2, sizeof(f2), TEST_INPUT_ROOT, "banana.txt");
+    path_join(f1, sizeof(f1), TEST_INPUT_ROOT, "apple.txt");
+    path_join(f2, sizeof(f2), TEST_INPUT_ROOT, "banana.txt");
     write_file(f1, "a");
     write_file(f2, "b");
 
