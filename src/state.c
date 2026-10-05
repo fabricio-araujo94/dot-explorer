@@ -311,7 +311,7 @@ bool state_init(AppState *state) {
         return false;
     }
     if (getcwd(state->current_path, sizeof(state->current_path)) == NULL) {
-        strcpy(state->current_path, "/");
+        return false;
     }
     fs_init_dir_list(&state->dir_list);
     state->selected_index = 0;

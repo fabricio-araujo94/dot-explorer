@@ -114,17 +114,22 @@ void ui_show_message(const char *title, const char *message) {
     mvwaddnstr(win, 0, 2, safe_title, box_w - 4);
 
     int line_y = 2;
-    char *msg_copy = strdup(safe_message);
-    if (!msg_copy) {
-        delwin(win);
-        return;
+    const char *line = safe_message;
+    while (*line != '\0' && line_y < box_h - 2) {
+        const char *line_end;
+        size_t line_length;
+
+        while (*line == '\n') line++;
+        if (*line == '\0') break;
+        line_end = strchr(line, '\n');
+        line_length = line_end ? (size_t)(line_end - line) : strlen(line);
+        if (line_length > (size_t)(box_w - 4)) {
+            line_length = (size_t)(box_w - 4);
+        }
+        mvwaddnstr(win, line_y++, 2, line, (int)line_length);
+        if (!line_end) break;
+        line = line_end + 1;
     }
-    char *line = strtok(msg_copy, "\n");
-    while (line != NULL && line_y < box_h - 2) {
-        mvwaddnstr(win, line_y++, 2, line, box_w - 4);
-        line = strtok(NULL, "\n");
-    }
-    free(msg_copy);
 
     mvwaddnstr(win, box_h - 2, 2, "[ Press any key to close ]", box_w - 4);
 
