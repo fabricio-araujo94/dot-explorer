@@ -137,12 +137,12 @@ static bool remove_tree(const char *path, char *error_path, size_t error_path_si
     return true;
 }
 
-static bool copy_regular_file(const char *src_path, const char *dest_path,
-                              const struct stat *source_stat,
-                              const FsCopyOptions *options,
-                              char *error_path, size_t error_path_size) {
-    FILE *src = NULL;
-    FILE *dest = NULL;
+static bool copy_file_contents(const char *src_path, const char *dest_path,
+                               const struct stat *source_stat,
+                               const FsCopyOptions *options,
+                               char *error_path, size_t error_path_size) {
+    FILE *src;
+    FILE *dest;
     char buffer[8192];
     size_t bytes;
     uint64_t copied = 0;
@@ -194,24 +194,38 @@ static bool copy_regular_file(const char *src_path, const char *dest_path,
     if (read_error || !source_closed || !dest_closed) {
         success = false;
     }
-    src = NULL;
-    dest = NULL;
-    if (success && chmod(dest_path, source_stat->st_mode & 07777) != 0) {
-        success = false;
-    }
-    if (success) {
-        struct utimbuf times = { source_stat->st_atime, source_stat->st_mtime };
-        if (utime(dest_path, &times) != 0) {
-            success = false;
-        }
-    }
-    if (success && options && options->file_complete) {
-        options->file_complete(options->progress_context);
-    }
     if (!success) {
         set_error_path(error_path, error_path_size, dest_path);
     }
     return success;
+}
+
+static bool copy_file_metadata(const char *dest_path,
+                               const struct stat *source_stat,
+                               char *error_path, size_t error_path_size) {
+    struct utimbuf times = { source_stat->st_atime, source_stat->st_mtime };
+
+    if (chmod(dest_path, source_stat->st_mode & 07777) != 0 ||
+        utime(dest_path, &times) != 0) {
+        set_error_path(error_path, error_path_size, dest_path);
+        return false;
+    }
+    return true;
+}
+
+static bool copy_regular_file(const char *src_path, const char *dest_path,
+                              const struct stat *source_stat,
+                              const FsCopyOptions *options,
+                              char *error_path, size_t error_path_size) {
+    if (!copy_file_contents(src_path, dest_path, source_stat, options,
+                            error_path, error_path_size) ||
+        !copy_file_metadata(dest_path, source_stat, error_path, error_path_size)) {
+        return false;
+    }
+    if (options && options->file_complete) {
+        options->file_complete(options->progress_context);
+    }
+    return true;
 }
 
 static bool copy_symlink(const char *src_path, const char *dest_path,
