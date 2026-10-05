@@ -433,6 +433,35 @@ void fs_sort_dir_list(DirectoryList *list, SortType sort_type) {
     qsort(list->entries, list->count, sizeof(FileEntry), comparator);
 }
 
+static bool populate_file_entry(FileEntry *entry, const struct dirent *directory_entry,
+                                const char *directory_path) {
+    char full_path[PATH_MAX];
+    struct stat st;
+
+    strncpy(entry->name, directory_entry->d_name, sizeof(entry->name) - 1);
+    entry->name[sizeof(entry->name) - 1] = '\0';
+    entry->is_selected = false;
+
+    if (!path_join(full_path, sizeof(full_path), directory_path,
+                   directory_entry->d_name)) {
+        return false;
+    }
+    if (lstat(full_path, &st) == 0) {
+        entry->is_dir = S_ISDIR(st.st_mode);
+        entry->size = st.st_size;
+        entry->mtime = st.st_mtime;
+        entry->mode = st.st_mode;
+        entry->is_symlink = S_ISLNK(st.st_mode);
+    } else {
+        entry->is_dir = directory_entry->d_type == DT_DIR;
+        entry->size = 0;
+        entry->mtime = 0;
+        entry->mode = 0;
+        entry->is_symlink = false;
+    }
+    return true;
+}
+
 bool fs_read_dir(const char *path, DirectoryList *list) {
     DIR *dir = opendir(path);
     if (!dir) {
@@ -452,7 +481,6 @@ bool fs_read_dir(const char *path, DirectoryList *list) {
     }
 
     struct dirent *dp;
-    char full_path[PATH_MAX];
 
     while ((dp = readdir(dir)) != NULL) {
         if (strcmp(dp->d_name, ".") == 0) continue;
@@ -471,30 +499,10 @@ bool fs_read_dir(const char *path, DirectoryList *list) {
         }
 
         FileEntry *entry = &list->entries[list->count];
-        strncpy(entry->name, dp->d_name, sizeof(entry->name) - 1);
-        entry->name[sizeof(entry->name) - 1] = '\0';
-        entry->is_selected = false;
-
-        if (!path_join(full_path, sizeof(full_path), path, dp->d_name)) {
+        if (!populate_file_entry(entry, dp, path)) {
             closedir(dir);
             return false;
         }
-
-        struct stat st;
-        if (lstat(full_path, &st) == 0) {
-            entry->is_dir = S_ISDIR(st.st_mode);
-            entry->size = st.st_size;
-            entry->mtime = st.st_mtime;
-            entry->mode = st.st_mode;
-            entry->is_symlink = S_ISLNK(st.st_mode);
-        } else {
-            entry->is_dir = (dp->d_type == DT_DIR);
-            entry->size = 0;
-            entry->mtime = 0;
-            entry->mode = 0;
-            entry->is_symlink = false;
-        }
-
         list->count++;
     }
 
