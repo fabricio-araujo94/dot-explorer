@@ -132,43 +132,58 @@ static const char *file_extension(const char *name) {
     return dot ? dot : "";
 }
 
-static void safe_draw_line(int y, int x, const char *str, int max_cols) {
-    if (max_cols <= 0) return;
-    int cur_col = 0;
-    mbstate_t ps;
-    memset(&ps, 0, sizeof(ps));
-    const char *p = str;
-    size_t remaining = strlen(str);
-    char chunk[PATH_MAX];
-    size_t chunk_len = 0;
+typedef struct {
+    const char *cursor;
+    size_t remaining;
+    mbstate_t conversion_state;
+    char *chunk;
+    size_t chunk_length;
+    int columns;
+} DrawLineState;
 
-    while (remaining > 0 && cur_col < max_cols) {
-        wchar_t wc;
-        size_t n = mbrtowc(&wc, p, remaining, &ps);
-        if (n == (size_t)-1 || n == (size_t)-2 || n == 0) {
-            if (cur_col + 1 <= max_cols && chunk_len + 1 < sizeof(chunk)) {
-                chunk[chunk_len++] = *p ? *p : ' ';
-                cur_col += 1;
-            }
-            p++;
-            remaining--;
-            memset(&ps, 0, sizeof(ps));
-            continue;
+static bool append_next_character(DrawLineState *line, int max_cols) {
+    wchar_t character;
+    size_t byte_count = mbrtowc(&character, line->cursor, line->remaining,
+                                &line->conversion_state);
+
+    if (byte_count == (size_t)-1 || byte_count == (size_t)-2 || byte_count == 0) {
+        if (line->columns + 1 <= max_cols && line->chunk_length + 1 < PATH_MAX) {
+            line->chunk[line->chunk_length++] = *line->cursor ? *line->cursor : ' ';
+            line->columns++;
         }
-        int w = wcwidth(wc);
-        if (w < 0) w = 0;
-        if (cur_col + w > max_cols) {
+        line->cursor++;
+        line->remaining--;
+        memset(&line->conversion_state, 0, sizeof(line->conversion_state));
+        return true;
+    }
+
+    int column_width = wcwidth(character);
+    if (column_width < 0) column_width = 0;
+    if (line->columns + column_width > max_cols) {
+        return false;
+    }
+    if (line->chunk_length + byte_count < PATH_MAX) {
+        memcpy(line->chunk + line->chunk_length, line->cursor, byte_count);
+        line->chunk_length += byte_count;
+    }
+    line->columns += column_width;
+    line->cursor += byte_count;
+    line->remaining -= byte_count;
+    return true;
+}
+
+static void safe_draw_line(int y, int x, const char *str, int max_cols) {
+    char chunk[PATH_MAX];
+    DrawLineState line;
+
+    if (max_cols <= 0) return;
+    line = (DrawLineState){ str, strlen(str), { 0 }, chunk, 0, 0 };
+    while (line.remaining > 0 && line.columns < max_cols) {
+        if (!append_next_character(&line, max_cols)) {
             break;
         }
-        if (chunk_len + n < sizeof(chunk)) {
-            memcpy(chunk + chunk_len, p, n);
-            chunk_len += n;
-        }
-        cur_col += w;
-        p += n;
-        remaining -= n;
     }
-    chunk[chunk_len] = '\0';
+    chunk[line.chunk_length] = '\0';
     mvaddstr(y, x, chunk);
 }
 
