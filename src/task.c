@@ -79,10 +79,21 @@ static void *copy_worker(void *context) {
     return NULL;
 }
 
-void task_init(Task *task) {
+bool task_init(Task *task) {
+    int result;
+
+    if (!task) {
+        errno = EINVAL;
+        return false;
+    }
     memset(task, 0, sizeof(*task));
-    pthread_mutex_init(&task->mutex, NULL);
+    result = pthread_mutex_init(&task->mutex, NULL);
+    if (result != 0) {
+        errno = result;
+        return false;
+    }
     task->status = TASK_IDLE;
+    return true;
 }
 
 void task_cleanup(Task *task) {

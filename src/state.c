@@ -305,7 +305,11 @@ bool clipboard_apply_operation(Clipboard *clipboard, const char *destination_dir
     return true;
 }
 
-void state_init(AppState *state) {
+bool state_init(AppState *state) {
+    if (!state) {
+        errno = EINVAL;
+        return false;
+    }
     if (getcwd(state->current_path, sizeof(state->current_path)) == NULL) {
         strcpy(state->current_path, "/");
     }
@@ -319,8 +323,12 @@ void state_init(AppState *state) {
     state->filter_query[0] = '\0';
     memset(&state->history, 0, sizeof(state->history));
 
-    fs_read_dir(state->current_path, &state->dir_list);
+    if (!fs_read_dir(state->current_path, &state->dir_list)) {
+        state_cleanup(state);
+        return false;
+    }
     fs_sort_dir_list(&state->dir_list, state->sort_type);
+    return true;
 }
 
 void state_cleanup(AppState *state) {

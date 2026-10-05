@@ -22,12 +22,12 @@ typedef struct {
     bool task_refresh_pending;
 } DualPaneUI;
 
-void ui_init(void);
+bool ui_init(void);
 void ui_cleanup(void);
 
 void ui_draw(DualPaneUI *ui);
 void ui_update(DualPaneUI *ui);
-void ui_dual_init(DualPaneUI *ui);
+bool ui_dual_init(DualPaneUI *ui);
 void ui_dual_cleanup(DualPaneUI *ui);
 void ui_handle_input(DualPaneUI *ui, int ch);
 void ui_render_filter_prompt(const char *query);

@@ -28,7 +28,7 @@ typedef struct {
     char error_path[PATH_MAX];
 } Task;
 
-void task_init(Task *task);
+bool task_init(Task *task);
 void task_cleanup(Task *task);
 bool task_start_copy(Task *task, const char *source, const char *destination);
 void task_request_cancel(Task *task);

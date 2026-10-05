@@ -46,7 +46,7 @@ typedef struct {
     NavigationHistory history;
 } AppState;
 
-void state_init(AppState *state);
+bool state_init(AppState *state);
 void state_cleanup(AppState *state);
 bool state_change_dir(AppState *state, const char *new_path);
 void filtered_index_list_clear(FilteredIndexList *list);

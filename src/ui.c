@@ -9,26 +9,32 @@
 #include <stdio.h>
 #include <wchar.h>
 
-void ui_init(void) {
-    initscr();
-    cbreak();
-    noecho();
-    keypad(stdscr, TRUE);
+bool ui_init(void) {
+    if (!initscr()) {
+        return false;
+    }
+    if (cbreak() == ERR || noecho() == ERR || keypad(stdscr, TRUE) == ERR) {
+        endwin();
+        return false;
+    }
     curs_set(0);
 
     if (has_colors()) {
-        start_color();
-        use_default_colors();
-        init_pair(THEME_PAIR_CYAN, COLOR_CYAN, -1);
-        init_pair(THEME_PAIR_NORMAL, COLOR_WHITE, -1);
-        init_pair(THEME_PAIR_ACTIVE, COLOR_BLACK, COLOR_CYAN);
-        init_pair(THEME_PAIR_PROMPT, COLOR_WHITE, COLOR_BLUE);
-        init_pair(THEME_PAIR_DIRECTORY, COLOR_BLUE, -1);
-        init_pair(THEME_PAIR_EXECUTABLE, COLOR_GREEN, -1);
-        init_pair(THEME_PAIR_IMAGE, COLOR_MAGENTA, -1);
-        init_pair(THEME_PAIR_ARCHIVE, COLOR_RED, -1);
-        init_pair(THEME_PAIR_SYMLINK, COLOR_CYAN, -1);
+        if (start_color() == ERR || use_default_colors() == ERR ||
+            init_pair(THEME_PAIR_CYAN, COLOR_CYAN, -1) == ERR ||
+            init_pair(THEME_PAIR_NORMAL, COLOR_WHITE, -1) == ERR ||
+            init_pair(THEME_PAIR_ACTIVE, COLOR_BLACK, COLOR_CYAN) == ERR ||
+            init_pair(THEME_PAIR_PROMPT, COLOR_WHITE, COLOR_BLUE) == ERR ||
+            init_pair(THEME_PAIR_DIRECTORY, COLOR_BLUE, -1) == ERR ||
+            init_pair(THEME_PAIR_EXECUTABLE, COLOR_GREEN, -1) == ERR ||
+            init_pair(THEME_PAIR_IMAGE, COLOR_MAGENTA, -1) == ERR ||
+            init_pair(THEME_PAIR_ARCHIVE, COLOR_RED, -1) == ERR ||
+            init_pair(THEME_PAIR_SYMLINK, COLOR_CYAN, -1) == ERR) {
+            endwin();
+            return false;
+        }
     }
+    return true;
 }
 
 void ui_cleanup(void) {
@@ -236,15 +242,27 @@ static void draw_pane(const Pane *pane, bool active) {
                     COLOR_PAIR(THEME_PAIR_NORMAL));
 }
 
-void ui_dual_init(DualPaneUI *ui) {
+bool ui_dual_init(DualPaneUI *ui) {
+    if (!ui) {
+        return false;
+    }
     memset(ui, 0, sizeof(*ui));
-    state_init(&ui->panes[0].state);
-    state_init(&ui->panes[1].state);
+    if (!state_init(&ui->panes[0].state)) {
+        return false;
+    }
+    if (!state_init(&ui->panes[1].state)) {
+        state_cleanup(&ui->panes[0].state);
+        return false;
+    }
     ui->active_pane_index = 0;
-    memset(&ui->clipboard, 0, sizeof(ui->clipboard));
     ui->task_destination_pane = -1;
     ui->task_refresh_pending = false;
-    task_init(&ui->task);
+    if (!task_init(&ui->task)) {
+        state_cleanup(&ui->panes[0].state);
+        state_cleanup(&ui->panes[1].state);
+        return false;
+    }
+    return true;
 }
 
 void ui_dual_cleanup(DualPaneUI *ui) {

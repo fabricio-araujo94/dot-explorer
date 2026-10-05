@@ -33,7 +33,9 @@ static void write_dummy_file(const char *path, const char *content) {
 
 static void test_state_init_and_cleanup(void) {
     AppState state;
-    state_init(&state);
+    assert(!state_init(NULL));
+    assert(errno == EINVAL);
+    assert(state_init(&state));
     assert(state.dir_list.entries != NULL || state.dir_list.count == 0);
     assert(state.selected_index == 0);
     assert(state.scroll_offset == 0);

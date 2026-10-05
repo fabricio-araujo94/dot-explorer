@@ -33,7 +33,9 @@ static void write_dummy_file(const char *path, const char *content) {
 
 static void test_task_init_and_cleanup(void) {
     Task task;
-    task_init(&task);
+    assert(!task_init(NULL));
+    assert(errno == EINVAL);
+    assert(task_init(&task));
     assert(task.status == TASK_IDLE);
     assert(!task_is_running(&task));
     task_cleanup(&task);
