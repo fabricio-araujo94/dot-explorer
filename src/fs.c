@@ -241,6 +241,66 @@ static bool copy_symlink(const char *src_path, const char *dest_path,
 static bool copy_tree(const char *src_path, const char *dest_path,
                       const FsCopyOptions *options,
                       char *error_path, size_t error_path_size,
+                      unsigned int depth);
+
+static bool create_copy_directory(const char *dest_path, mode_t source_mode,
+                                  char *error_path, size_t error_path_size) {
+    mode_t temp_mode = (source_mode & 07777) | S_IRWXU;
+
+    if (platform_mkdir(dest_path, temp_mode) != 0 && errno != EEXIST) {
+        set_error_path(error_path, error_path_size, dest_path);
+        return false;
+    }
+    if (access(dest_path, W_OK | X_OK) != 0) {
+        set_error_path(error_path, error_path_size, dest_path);
+        return false;
+    }
+    return true;
+}
+
+static bool copy_directory_children(const char *src_path, const char *dest_path,
+                                    const FsCopyOptions *options,
+                                    char *error_path, size_t error_path_size,
+                                    unsigned int depth) {
+    DIR *dir = opendir(src_path);
+    struct dirent *entry;
+
+    if (!dir) {
+        set_error_path(error_path, error_path_size, src_path);
+        return false;
+    }
+    while ((entry = readdir(dir)) != NULL) {
+        char source_child[PATH_MAX];
+        char dest_child[PATH_MAX];
+
+        if (options && options->is_cancelled &&
+            options->is_cancelled(options->progress_context)) {
+            closedir(dir);
+            errno = ECANCELED;
+            set_error_path(error_path, error_path_size, src_path);
+            return false;
+        }
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        if (!path_join(source_child, sizeof(source_child), src_path, entry->d_name) ||
+            !path_join(dest_child, sizeof(dest_child), dest_path, entry->d_name) ||
+            !copy_tree(source_child, dest_child, options, error_path, error_path_size,
+                       depth + 1)) {
+            closedir(dir);
+            return false;
+        }
+    }
+    if (closedir(dir) != 0) {
+        set_error_path(error_path, error_path_size, dest_path);
+        return false;
+    }
+    return true;
+}
+
+static bool copy_tree(const char *src_path, const char *dest_path,
+                      const FsCopyOptions *options,
+                      char *error_path, size_t error_path_size,
                       unsigned int depth) {
     struct stat source_stat;
     bool follow_symlinks = options && options->follow_symlinks;
@@ -259,44 +319,13 @@ static bool copy_tree(const char *src_path, const char *dest_path,
         return copy_symlink(src_path, dest_path, error_path, error_path_size);
     }
     if (S_ISDIR(source_stat.st_mode)) {
-        DIR *dir;
-        struct dirent *entry;
-        mode_t temp_mode = (source_stat.st_mode & 07777) | S_IRWXU;
-        if (platform_mkdir(dest_path, temp_mode) != 0 && errno != EEXIST) {
-            set_error_path(error_path, error_path_size, dest_path);
+        if (!create_copy_directory(dest_path, source_stat.st_mode,
+                                   error_path, error_path_size) ||
+            !copy_directory_children(src_path, dest_path, options,
+                                     error_path, error_path_size, depth)) {
             return false;
         }
-        if (access(dest_path, W_OK | X_OK) != 0) {
-            set_error_path(error_path, error_path_size, dest_path);
-            return false;
-        }
-        dir = opendir(src_path);
-        if (!dir) {
-            set_error_path(error_path, error_path_size, src_path);
-            return false;
-        }
-        while ((entry = readdir(dir)) != NULL) {
-            char source_child[PATH_MAX];
-            char dest_child[PATH_MAX];
-            if (options && options->is_cancelled &&
-                options->is_cancelled(options->progress_context)) {
-                closedir(dir);
-                errno = ECANCELED;
-                set_error_path(error_path, error_path_size, src_path);
-                return false;
-            }
-            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-                continue;
-            }
-            if (!path_join(source_child, sizeof(source_child), src_path, entry->d_name) ||
-                !path_join(dest_child, sizeof(dest_child), dest_path, entry->d_name) ||
-                !copy_tree(source_child, dest_child, options, error_path, error_path_size,
-                            depth + 1)) {
-                closedir(dir);
-                return false;
-            }
-        }
-        if (closedir(dir) != 0 || chmod(dest_path, source_stat.st_mode & 07777) != 0) {
+        if (chmod(dest_path, source_stat.st_mode & 07777) != 0) {
             set_error_path(error_path, error_path_size, dest_path);
             return false;
         }
