@@ -453,6 +453,9 @@ static bool populate_file_entry(FileEntry *entry, const struct dirent *directory
         entry->mode = st.st_mode;
         entry->is_symlink = S_ISLNK(st.st_mode);
     } else {
+        if (directory_entry->d_type == DT_UNKNOWN) {
+            return false;
+        }
         entry->is_dir = directory_entry->d_type == DT_DIR;
         entry->size = 0;
         entry->mtime = 0;
@@ -500,7 +503,9 @@ bool fs_read_dir(const char *path, DirectoryList *list) {
 
         FileEntry *entry = &list->entries[list->count];
         if (!populate_file_entry(entry, dp, path)) {
+            int error = errno;
             closedir(dir);
+            errno = error;
             return false;
         }
         list->count++;
