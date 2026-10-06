@@ -2,6 +2,7 @@
 #include "fs.h"
 #include "utils.h"
 #include "config.h"
+#include "test_helpers.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -12,7 +13,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define TEST_INPUT_ROOT "/tmp/dot-explorer-input-test"
+static char TEST_INPUT_ROOT[PATH_MAX];
 
 typedef struct {
     char last_message_title[128];
@@ -97,8 +98,9 @@ static void init_mock_context(MockUIContext *ctx, InputCallbacks *cb) {
 }
 
 static void setup_env(void) {
+    assert(test_get_temp_dir(TEST_INPUT_ROOT, sizeof(TEST_INPUT_ROOT), "dot-explorer-input-test"));
     fs_delete_recursive(TEST_INPUT_ROOT);
-    assert(mkdir(TEST_INPUT_ROOT, 0700) == 0);
+    assert(platform_mkdir(TEST_INPUT_ROOT, 0700) == 0);
 }
 
 static void teardown_env(void) {
@@ -170,6 +172,123 @@ static void test_navigation_and_selection(void) {
     assert(state.dir_list.entries[0].is_selected);
     assert(state.selected_index == 1);
 
+    /* Toggle again */
+    state.selected_index = 0;
+    input_handle(&state, &cb, input_key_event(DOT_KEY_SELECT), &icb);
+    assert(!state.dir_list.entries[0].is_selected);
+
+    state_cleanup(&state);
+    teardown_env();
+}
+
+static void test_enter_open_and_back(void) {
+    AppState state;
+    Clipboard cb;
+    MockUIContext ctx;
+    InputCallbacks icb;
+    char subdir[PATH_MAX], f1[PATH_MAX];
+
+    setup_env();
+    path_join(subdir, sizeof(subdir), TEST_INPUT_ROOT, "subfolder");
+    path_join(f1, sizeof(f1), TEST_INPUT_ROOT, "test.txt");
+    assert(platform_mkdir(subdir, 0700) == 0);
+    write_file(f1, "hello");
+
+    state_init(&state);
+    state_change_dir(&state, TEST_INPUT_ROOT);
+    memset(&cb, 0, sizeof(cb));
+    init_mock_context(&ctx, &icb);
+
+    /* Select subfolder and press enter */
+    for (size_t i = 0; i < state.dir_list.count; ++i) {
+        if (strcmp(state.dir_list.entries[i].name, "subfolder") == 0) {
+            state.selected_index = (int)i;
+            break;
+        }
+    }
+    input_handle(&state, &cb, input_key_event(DOT_KEY_ENTER_DIR), &icb);
+    assert(strstr(state.current_path, "subfolder") != NULL);
+    assert(state.history.back_count == 1);
+
+    /* Press back (DOT_KEY_BACK_DIR / KEY_LEFT / KEY_BACKSPACE) */
+    input_handle(&state, &cb, input_key_event(DOT_KEY_BACK_DIR), &icb);
+    assert(strcmp(path_basename(state.current_path), "dot-explorer-input-test") == 0 ||
+           strstr(state.current_path, "dot-explorer-input-test") != NULL);
+
+    /* Select test.txt and press KEY_RIGHT to open file */
+    for (size_t i = 0; i < state.dir_list.count; ++i) {
+        if (strcmp(state.dir_list.entries[i].name, "test.txt") == 0) {
+            state.selected_index = (int)i;
+            break;
+        }
+    }
+    input_handle(&state, &cb, input_key_event(KEY_RIGHT), &icb);
+    assert(ctx.open_file_count == 1);
+    assert(strstr(ctx.last_opened_file, "test.txt") != NULL);
+
+    state_cleanup(&state);
+    teardown_env();
+}
+
+static void test_history_navigation_keys(void) {
+    AppState state;
+    Clipboard cb;
+    MockUIContext ctx;
+    InputCallbacks icb;
+    char subdir1[PATH_MAX], subdir2[PATH_MAX];
+
+    setup_env();
+    path_join(subdir1, sizeof(subdir1), TEST_INPUT_ROOT, "dir1");
+    path_join(subdir2, sizeof(subdir2), TEST_INPUT_ROOT, "dir2");
+    assert(platform_mkdir(subdir1, 0700) == 0);
+    assert(platform_mkdir(subdir2, 0700) == 0);
+
+    state_init(&state);
+    state_change_dir(&state, TEST_INPUT_ROOT);
+    memset(&cb, 0, sizeof(cb));
+    init_mock_context(&ctx, &icb);
+
+    /* Enter dir1 */
+    state_change_dir(&state, subdir1);
+    history_push(&state, TEST_INPUT_ROOT, 0);
+
+    /* Enter dir2 */
+    state_change_dir(&state, subdir2);
+    history_push(&state, subdir1, 0);
+
+    /* History back */
+    input_handle(&state, &cb, input_key_event(DOT_KEY_HISTORY_BACK), &icb);
+    assert(strstr(state.current_path, "dir1") != NULL);
+
+    /* History forward */
+    input_handle(&state, &cb, input_key_event(DOT_KEY_HISTORY_FORWARD), &icb);
+    assert(strstr(state.current_path, "dir2") != NULL);
+
+    state_cleanup(&state);
+    teardown_env();
+}
+
+static void test_refresh_key(void) {
+    AppState state;
+    Clipboard cb;
+    MockUIContext ctx;
+    InputCallbacks icb;
+    char f1[PATH_MAX];
+
+    setup_env();
+    state_init(&state);
+    state_change_dir(&state, TEST_INPUT_ROOT);
+    memset(&cb, 0, sizeof(cb));
+    init_mock_context(&ctx, &icb);
+
+    size_t count_before = state.dir_list.count;
+
+    path_join(f1, sizeof(f1), TEST_INPUT_ROOT, "added_externally.txt");
+    write_file(f1, "content");
+
+    input_handle(&state, &cb, input_key_event(DOT_KEY_REFRESH), &icb);
+    assert(state.dir_list.count == count_before + 1);
+
     state_cleanup(&state);
     teardown_env();
 }
@@ -196,39 +315,54 @@ static void test_sorting_commands(void) {
     state_cleanup(&state);
 }
 
-static void test_clipboard_copy_and_cut(void) {
+static void test_clipboard_copy_cut_paste_multi(void) {
     AppState state;
     Clipboard cb;
     MockUIContext ctx;
     InputCallbacks icb;
-    char f1[PATH_MAX];
+    char f1[PATH_MAX], f2[PATH_MAX], dest_dir[PATH_MAX];
 
     setup_env();
-    path_join(f1, sizeof(f1), TEST_INPUT_ROOT, "sample.txt");
-    write_file(f1, "data");
+    path_join(f1, sizeof(f1), TEST_INPUT_ROOT, "f1.txt");
+    path_join(f2, sizeof(f2), TEST_INPUT_ROOT, "f2.txt");
+    path_join(dest_dir, sizeof(dest_dir), TEST_INPUT_ROOT, "destination");
+    write_file(f1, "111");
+    write_file(f2, "222");
+    assert(platform_mkdir(dest_dir, 0700) == 0);
 
     state_init(&state);
     state_change_dir(&state, TEST_INPUT_ROOT);
     memset(&cb, 0, sizeof(cb));
     init_mock_context(&ctx, &icb);
 
-    /* Find sample.txt index */
+    /* Mark f1.txt and f2.txt as selected */
     for (size_t i = 0; i < state.dir_list.count; ++i) {
-        if (strcmp(state.dir_list.entries[i].name, "sample.txt") == 0) {
-            state.selected_index = (int)i;
-            break;
+        if (strcmp(state.dir_list.entries[i].name, "f1.txt") == 0 ||
+            strcmp(state.dir_list.entries[i].name, "f2.txt") == 0) {
+            state.dir_list.entries[i].is_selected = true;
         }
     }
 
-    /* Copy */
+    /* Copy multi selected */
     input_handle(&state, &cb, input_key_event(DOT_KEY_COPY), &icb);
-    assert(cb.count == 1);
+    assert(cb.count == 2);
     assert(!cb.is_cut);
-    assert(strstr(cb.paths[0], "sample.txt") != NULL);
 
-    /* Cut */
+    /* Navigate to dest_dir and Paste */
+    state_change_dir(&state, dest_dir);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_PASTE), &icb);
+    assert(state.dir_list.count >= 2);
+
+    /* Test Cut multi selected */
+    state_change_dir(&state, TEST_INPUT_ROOT);
+    for (size_t i = 0; i < state.dir_list.count; ++i) {
+        if (strcmp(state.dir_list.entries[i].name, "f1.txt") == 0 ||
+            strcmp(state.dir_list.entries[i].name, "f2.txt") == 0) {
+            state.dir_list.entries[i].is_selected = true;
+        }
+    }
     input_handle(&state, &cb, input_key_event(DOT_KEY_CUT), &icb);
-    assert(cb.count == 1);
+    assert(cb.count == 2);
     assert(cb.is_cut);
 
     clipboard_clear(&cb);
@@ -261,21 +395,28 @@ static void test_create_file_and_dir(void) {
     path_join(expected_dir, sizeof(expected_dir), TEST_INPUT_ROOT, "newdir");
     assert(access(expected_dir, F_OK) == 0);
 
+    /* When prompt is cancelled (returns false) */
+    ctx.prompt_return_value = false;
+    input_handle(&state, &cb, input_key_event(DOT_KEY_CREATE_FILE), &icb);
+    input_handle(&state, &cb, input_key_event(DOT_KEY_CREATE_DIR), &icb);
+
     state_cleanup(&state);
     teardown_env();
 }
 
-static void test_rename_and_delete(void) {
+static void test_rename_and_delete_multi(void) {
     AppState state;
     Clipboard cb;
     MockUIContext ctx;
     InputCallbacks icb;
-    char initial_path[PATH_MAX], renamed_path[PATH_MAX];
+    char initial_path[PATH_MAX], renamed_path[PATH_MAX], f2[PATH_MAX];
 
     setup_env();
     path_join(initial_path, sizeof(initial_path), TEST_INPUT_ROOT, "orig.txt");
     path_join(renamed_path, sizeof(renamed_path), TEST_INPUT_ROOT, "renamed.txt");
+    path_join(f2, sizeof(f2), TEST_INPUT_ROOT, "other.txt");
     write_file(initial_path, "test");
+    write_file(f2, "test2");
 
     state_init(&state);
     state_change_dir(&state, TEST_INPUT_ROOT);
@@ -296,11 +437,11 @@ static void test_rename_and_delete(void) {
     assert(access(initial_path, F_OK) != 0);
     assert(access(renamed_path, F_OK) == 0);
 
-    /* Select renamed.txt */
+    /* Select both renamed.txt and other.txt for multi delete */
     for (size_t i = 0; i < state.dir_list.count; ++i) {
-        if (strcmp(state.dir_list.entries[i].name, "renamed.txt") == 0) {
-            state.selected_index = (int)i;
-            break;
+        if (strcmp(state.dir_list.entries[i].name, "renamed.txt") == 0 ||
+            strcmp(state.dir_list.entries[i].name, "other.txt") == 0) {
+            state.dir_list.entries[i].is_selected = true;
         }
     }
 
@@ -308,11 +449,66 @@ static void test_rename_and_delete(void) {
     snprintf(ctx.prompt_response, sizeof(ctx.prompt_response), "n");
     input_handle(&state, &cb, input_key_event(DOT_KEY_DELETE_ITEM), &icb);
     assert(access(renamed_path, F_OK) == 0);
+    assert(access(f2, F_OK) == 0);
 
     /* Delete with 'y' response */
     snprintf(ctx.prompt_response, sizeof(ctx.prompt_response), "y");
     input_handle(&state, &cb, input_key_event(DOT_KEY_DELETE_ITEM), &icb);
     assert(access(renamed_path, F_OK) != 0);
+    assert(access(f2, F_OK) != 0);
+
+    state_cleanup(&state);
+    teardown_env();
+}
+
+static void test_navigation_entries_blocked_actions(void) {
+    AppState state;
+    Clipboard cb;
+    MockUIContext ctx;
+    InputCallbacks icb;
+
+    setup_env();
+    state_init(&state);
+    state_change_dir(&state, TEST_INPUT_ROOT);
+    memset(&cb, 0, sizeof(cb));
+    init_mock_context(&ctx, &icb);
+
+    /* Select '.' or '..' entry */
+    int nav_idx = -1;
+    for (size_t i = 0; i < state.dir_list.count; ++i) {
+        if (strcmp(state.dir_list.entries[i].name, ".") == 0 ||
+            strcmp(state.dir_list.entries[i].name, "..") == 0) {
+            nav_idx = (int)i;
+            break;
+        }
+    }
+    if (nav_idx >= 0) {
+        state.selected_index = nav_idx;
+
+        /* Rename blocked */
+        ctx.message_count = 0;
+        input_handle(&state, &cb, input_key_event(DOT_KEY_RENAME_ITEM), &icb);
+        assert(ctx.message_count > 0);
+        assert(strcmp(ctx.last_message_title, "Rename blocked") == 0);
+
+        /* Delete blocked */
+        ctx.message_count = 0;
+        input_handle(&state, &cb, input_key_event(DOT_KEY_DELETE_ITEM), &icb);
+        assert(ctx.message_count > 0);
+        assert(strcmp(ctx.last_message_title, "Delete blocked") == 0);
+
+        /* Copy blocked */
+        ctx.message_count = 0;
+        input_handle(&state, &cb, input_key_event(DOT_KEY_COPY), &icb);
+        assert(ctx.message_count > 0);
+        assert(strcmp(ctx.last_message_title, "Copy blocked") == 0);
+
+        /* Cut blocked */
+        ctx.message_count = 0;
+        input_handle(&state, &cb, input_key_event(DOT_KEY_CUT), &icb);
+        assert(ctx.message_count > 0);
+        assert(strcmp(ctx.last_message_title, "Cut blocked") == 0);
+    }
 
     state_cleanup(&state);
     teardown_env();
@@ -378,6 +574,16 @@ static void test_filter_prompt_interactive(void) {
     assert(state.filter_active);
     assert(strcmp(state.filter_query, "ap") == 0);
 
+    /* Simulate backspace: 'a', 'p', '\b', '\n' */
+    int bs_keys[] = { 'a', 'p', '\b', '\n' };
+    ctx.key_stream = bs_keys;
+    ctx.key_stream_len = sizeof(bs_keys) / sizeof(bs_keys[0]);
+    ctx.key_stream_pos = 0;
+
+    input_handle(&state, &cb, input_key_event('/'), &icb);
+    assert(state.filter_active);
+    assert(strcmp(state.filter_query, "a") == 0);
+
     /* Simulate ESC */
     int esc_keys[] = { 27 };
     ctx.key_stream = esc_keys;
@@ -392,15 +598,39 @@ static void test_filter_prompt_interactive(void) {
     teardown_env();
 }
 
+static void test_edge_cases(void) {
+    AppState state;
+    Clipboard cb;
+    MockUIContext ctx;
+    InputCallbacks icb;
+
+    /* NULL state */
+    input_handle(NULL, NULL, input_key_event('q'), NULL);
+
+    /* Unbound key */
+    state_init(&state);
+    memset(&cb, 0, sizeof(cb));
+    init_mock_context(&ctx, &icb);
+    input_handle(&state, &cb, input_key_event(9999), &icb);
+    assert(!state.should_quit);
+
+    state_cleanup(&state);
+}
+
 int main(void) {
     test_quit_command();
     test_navigation_and_selection();
+    test_enter_open_and_back();
+    test_history_navigation_keys();
+    test_refresh_key();
     test_sorting_commands();
-    test_clipboard_copy_and_cut();
+    test_clipboard_copy_cut_paste_multi();
     test_create_file_and_dir();
-    test_rename_and_delete();
+    test_rename_and_delete_multi();
+    test_navigation_entries_blocked_actions();
     test_properties();
     test_filter_prompt_interactive();
+    test_edge_cases();
 
     printf("test_input: all tests passed\n");
     return 0;

@@ -9,7 +9,7 @@ SRCS = $(wildcard $(SRC_DIR)/*.c) $(wildcard $(SRC_DIR)/utils/*.c)
 OBJS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRCS))
 TARGET = dot-explorer
 
-TEST_TARGETS = test_fs test_state test_utils test_task test_input test_process
+TEST_TARGETS = test_fs test_state test_utils test_task test_input test_process test_ui
 
 all: $(TARGET)
 
@@ -20,6 +20,7 @@ test: $(TEST_TARGETS)
 	./test_task
 	./test_input
 	./test_process
+	./test_ui
 
 test_fs: tests/test_fs.c src/fs.c src/state.c src/task.c src/utils.c
 	$(CC) $(CFLAGS) $^ -pthread -o $@
@@ -38,6 +39,9 @@ test_input: tests/test_input.c src/input.c src/process.c src/fs.c src/state.c sr
 
 test_process: tests/test_process.c src/process.c
 	$(CC) $(CFLAGS) $^ -o $@
+
+test_ui: tests/test_ui.c src/ui.c src/input.c src/process.c src/fs.c src/state.c src/task.c src/utils.c src/utils/theme.c
+	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
 
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS)
