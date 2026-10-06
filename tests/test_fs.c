@@ -339,14 +339,27 @@ static void test_sort_dotdot_stays_first(void) {
     /* Sort by NAME */
     fs_sort_dir_list(&list, SORT_NAME);
     assert(strcmp(list.entries[0].name, "..") == 0);
+    assert(strcmp(list.entries[1].name, "alpha_dir") == 0);
+    assert(strcmp(list.entries[2].name, "beta_dir") == 0);
+    assert(strcmp(list.entries[3].name, "a_file.txt") == 0);
 
     /* Sort by SIZE */
     fs_sort_dir_list(&list, SORT_SIZE);
     assert(strcmp(list.entries[0].name, "..") == 0);
+    assert(strcmp(list.entries[1].name, "beta_dir") == 0);
+    assert(strcmp(list.entries[2].name, "alpha_dir") == 0);
+    assert(strcmp(list.entries[3].name, "z_file.txt") == 0);
 
     /* Sort by DATE */
     fs_sort_dir_list(&list, SORT_DATE);
     assert(strcmp(list.entries[0].name, "..") == 0);
+    assert(strcmp(list.entries[1].name, "beta_dir") == 0);
+    assert(strcmp(list.entries[2].name, "alpha_dir") == 0);
+    assert(strcmp(list.entries[3].name, "a_file.txt") == 0);
+
+    fs_sort_dir_list(&list, (SortType)99);
+    assert(strcmp(list.entries[0].name, "..") == 0);
+    assert(strcmp(list.entries[1].name, "alpha_dir") == 0);
 
     fs_free_dir_list(&list);
 }

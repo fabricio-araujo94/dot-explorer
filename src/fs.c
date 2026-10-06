@@ -420,16 +420,33 @@ static int compare_by_date(const void *a, const void *b) {
     return strcasecmp(entryA->name, entryB->name);
 }
 
+typedef int (*EntryComparator)(const void *, const void *);
+
+typedef struct {
+    SortType sort_type;
+    EntryComparator comparator;
+} SortComparator;
+
+static const SortComparator sort_comparators[] = {
+    { SORT_NAME, compare_by_name },
+    { SORT_SIZE, compare_by_size },
+    { SORT_DATE, compare_by_date }
+};
+
+static EntryComparator find_sort_comparator(SortType sort_type) {
+    for (size_t i = 0; i < sizeof(sort_comparators) / sizeof(sort_comparators[0]); ++i) {
+        if (sort_comparators[i].sort_type == sort_type) {
+            return sort_comparators[i].comparator;
+        }
+    }
+    return compare_by_name;
+}
+
 void fs_sort_dir_list(DirectoryList *list, SortType sort_type) {
     if (!list || list->count <= 1 || !list->entries) {
         return;
     }
-    int (*comparator)(const void *, const void *) = compare_by_name;
-    if (sort_type == SORT_SIZE) {
-        comparator = compare_by_size;
-    } else if (sort_type == SORT_DATE) {
-        comparator = compare_by_date;
-    }
+    EntryComparator comparator = find_sort_comparator(sort_type);
     qsort(list->entries, list->count, sizeof(FileEntry), comparator);
 }
 
