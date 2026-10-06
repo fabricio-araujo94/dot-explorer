@@ -37,7 +37,10 @@ typedef struct {
 /** Initialize a task and its mutex; false indicates invalid input or mutex failure. */
 bool task_init(Task *task);
 
-/** Request cancellation, join any worker, and destroy the task mutex. */
+/**
+ * Request cancellation, join any worker, and destroy the task mutex.
+ * Do not call concurrently with another task API operation.
+ */
 void task_cleanup(Task *task);
 
 /**

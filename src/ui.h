@@ -14,7 +14,10 @@ typedef struct {
     int height;
 } Pane;
 
-/** Two-pane terminal UI and resources shared between panes. */
+/**
+ * Two-pane terminal UI. Pane state, clipboard allocations, and task resources
+ * are owned by this object after successful initialization.
+ */
 typedef struct {
     Pane panes[2];
     int active_pane_index;
@@ -30,7 +33,10 @@ bool ui_init(void);
 /** Restore terminal state after successful ui_init. */
 void ui_cleanup(void);
 
-/** Draw both panes and the task status using the active ncurses screen. */
+/**
+ * Draw both panes and task status using the active ncurses screen.
+ * UI functions must be called from the thread that initialized ncurses.
+ */
 void ui_draw(DualPaneUI *ui);
 
 /** Reconcile completed background tasks and release finished workers. */

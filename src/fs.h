@@ -38,7 +38,10 @@ typedef struct {
     bool rollback_on_error;
 } FsCopyOptions;
 
-/** Optional synchronous callbacks invoked while a recursive copy runs. */
+/**
+ * Optional synchronous callbacks invoked while a recursive copy runs.
+ * The callback table and progress_context are borrowed until the copy returns.
+ */
 typedef struct {
     bool (*progress)(uint64_t bytes_copied, uint64_t total_bytes, void *context);
     bool (*is_cancelled)(void *context);
@@ -72,7 +75,7 @@ void fs_sort_dir_list(DirectoryList *list, SortType sort_type);
 bool fs_create_file(const char *path);
 /** Create a directory. Returns false and sets errno on failure. */
 bool fs_create_dir(const char *path);
-/** Delete a file or directory tree. Protected root/current-directory paths are rejected. */
+/** Delete a file or directory tree. Filesystem roots and dot segments are rejected. */
 bool fs_delete(const char *path);
 /** Recursively delete a path. Returns false and sets errno on failure. */
 bool fs_delete_recursive(const char *path);
