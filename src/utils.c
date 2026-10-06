@@ -59,7 +59,7 @@ bool path_is_absolute(const char *path) {
 }
 
 bool path_join(char *buffer, size_t size, const char *base, const char *name) {
-        const char separator = PLATFORM_PATH_SEPARATOR;
+    const char separator = PLATFORM_PATH_SEPARATOR;
     size_t base_length;
     size_t name_start = 0;
     int written;

@@ -41,8 +41,6 @@ void ui_cleanup(void) {
     endwin();
 }
 
-
-
 void ui_render_filter_prompt(const char *query) {
     int max_y, max_x;
     getmaxyx(stdscr, max_y, max_x);

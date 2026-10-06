@@ -20,7 +20,7 @@ static uint64_t tree_size(const char *path) {
     while ((entry = readdir(dir)) != NULL) {
         char child[PATH_MAX];
         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) continue;
-        if (snprintf(child, sizeof(child), "%s/%s", path, entry->d_name) < (int)sizeof(child)) {
+        if (path_join(child, sizeof(child), path, entry->d_name)) {
             total += tree_size(child);
         }
     }
