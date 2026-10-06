@@ -105,15 +105,15 @@ static void test_copy_into_itself(void) {
     char source[PATH_MAX];
     char nested[PATH_MAX];
     char error_path[PATH_MAX];
-    FsCopyOptions options = { false, true, NULL, NULL, NULL, NULL };
+    FsCopyOptions options = { false, true };
     setup();
     make_path(source, sizeof(source), "source.txt");
     write_file(source, "original");
-    assert(!fs_copy_recursive_with_options(source, source, &options,
+    assert(!fs_copy_recursive_with_options(source, source, &options, NULL,
                                            error_path, sizeof(error_path)));
     make_path(nested, sizeof(nested), "folder");
     assert(platform_mkdir(nested, 0700) == 0);
-    assert(!fs_copy_recursive_with_options(TEST_ROOT, nested, &options,
+    assert(!fs_copy_recursive_with_options(TEST_ROOT, nested, &options, NULL,
                                            error_path, sizeof(error_path)));
     assert(access(nested, F_OK) == 0);
     teardown();

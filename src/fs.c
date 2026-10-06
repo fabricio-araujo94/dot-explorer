@@ -139,7 +139,7 @@ static bool remove_tree(const char *path, char *error_path, size_t error_path_si
 
 static bool copy_file_contents(const char *src_path, const char *dest_path,
                                const struct stat *source_stat,
-                               const FsCopyOptions *options,
+                               const FsCopyCallbacks *callbacks,
                                char *error_path, size_t error_path_size) {
     FILE *src;
     FILE *dest;
@@ -169,8 +169,8 @@ static bool copy_file_contents(const char *src_path, const char *dest_path,
         return false;
     }
     while ((bytes = fread(buffer, 1, sizeof(buffer), src)) > 0) {
-        if (options && options->is_cancelled &&
-            options->is_cancelled(options->progress_context)) {
+        if (callbacks && callbacks->is_cancelled &&
+            callbacks->is_cancelled(callbacks->progress_context)) {
             errno = ECANCELED;
             success = false;
             break;
@@ -180,9 +180,9 @@ static bool copy_file_contents(const char *src_path, const char *dest_path,
             break;
         }
         copied += bytes;
-        if (options && options->progress &&
-            !options->progress(copied, (uint64_t)source_stat->st_size,
-                               options->progress_context)) {
+        if (callbacks && callbacks->progress &&
+            !callbacks->progress(copied, (uint64_t)source_stat->st_size,
+                                 callbacks->progress_context)) {
             errno = ECANCELED;
             success = false;
             break;
@@ -215,15 +215,15 @@ static bool copy_file_metadata(const char *dest_path,
 
 static bool copy_regular_file(const char *src_path, const char *dest_path,
                               const struct stat *source_stat,
-                              const FsCopyOptions *options,
+                              const FsCopyCallbacks *callbacks,
                               char *error_path, size_t error_path_size) {
-    if (!copy_file_contents(src_path, dest_path, source_stat, options,
+    if (!copy_file_contents(src_path, dest_path, source_stat, callbacks,
                             error_path, error_path_size) ||
         !copy_file_metadata(dest_path, source_stat, error_path, error_path_size)) {
         return false;
     }
-    if (options && options->file_complete) {
-        options->file_complete(options->progress_context);
+    if (callbacks && callbacks->file_complete) {
+        callbacks->file_complete(callbacks->progress_context);
     }
     return true;
 }
@@ -254,6 +254,7 @@ static bool copy_symlink(const char *src_path, const char *dest_path,
 
 static bool copy_tree(const char *src_path, const char *dest_path,
                       const FsCopyOptions *options,
+                      const FsCopyCallbacks *callbacks,
                       char *error_path, size_t error_path_size,
                       unsigned int depth);
 
@@ -274,6 +275,7 @@ static bool create_copy_directory(const char *dest_path, mode_t source_mode,
 
 static bool copy_directory_children(const char *src_path, const char *dest_path,
                                     const FsCopyOptions *options,
+                                    const FsCopyCallbacks *callbacks,
                                     char *error_path, size_t error_path_size,
                                     unsigned int depth) {
     DIR *dir = opendir(src_path);
@@ -287,8 +289,8 @@ static bool copy_directory_children(const char *src_path, const char *dest_path,
         char source_child[PATH_MAX];
         char dest_child[PATH_MAX];
 
-        if (options && options->is_cancelled &&
-            options->is_cancelled(options->progress_context)) {
+        if (callbacks && callbacks->is_cancelled &&
+            callbacks->is_cancelled(callbacks->progress_context)) {
             closedir(dir);
             errno = ECANCELED;
             set_error_path(error_path, error_path_size, src_path);
@@ -299,8 +301,8 @@ static bool copy_directory_children(const char *src_path, const char *dest_path,
         }
         if (!path_join(source_child, sizeof(source_child), src_path, entry->d_name) ||
             !path_join(dest_child, sizeof(dest_child), dest_path, entry->d_name) ||
-            !copy_tree(source_child, dest_child, options, error_path, error_path_size,
-                       depth + 1)) {
+            !copy_tree(source_child, dest_child, options, callbacks,
+                       error_path, error_path_size, depth + 1)) {
             closedir(dir);
             return false;
         }
@@ -314,6 +316,7 @@ static bool copy_directory_children(const char *src_path, const char *dest_path,
 
 static bool copy_tree(const char *src_path, const char *dest_path,
                       const FsCopyOptions *options,
+                      const FsCopyCallbacks *callbacks,
                       char *error_path, size_t error_path_size,
                       unsigned int depth) {
     struct stat source_stat;
@@ -335,7 +338,7 @@ static bool copy_tree(const char *src_path, const char *dest_path,
     if (S_ISDIR(source_stat.st_mode)) {
         if (!create_copy_directory(dest_path, source_stat.st_mode,
                                    error_path, error_path_size) ||
-            !copy_directory_children(src_path, dest_path, options,
+            !copy_directory_children(src_path, dest_path, options, callbacks,
                                      error_path, error_path_size, depth)) {
             return false;
         }
@@ -353,7 +356,7 @@ static bool copy_tree(const char *src_path, const char *dest_path,
         return true;
     }
     if (S_ISREG(source_stat.st_mode)) {
-        return copy_regular_file(src_path, dest_path, &source_stat, options,
+        return copy_regular_file(src_path, dest_path, &source_stat, callbacks,
                                  error_path, error_path_size);
     }
     set_error_path(error_path, error_path_size, src_path);
@@ -570,18 +573,19 @@ bool fs_rename(const char *old_path, const char *new_path) {
 
 
 bool fs_copy_recursive(const char *src_path, const char *dest_path) {
-    FsCopyOptions options = { false, true, NULL, NULL, NULL, NULL };
+    FsCopyOptions options = { false, true };
     char error_path[PATH_MAX];
-    return fs_copy_recursive_with_options(src_path, dest_path, &options,
+    return fs_copy_recursive_with_options(src_path, dest_path, &options, NULL,
                                           error_path, sizeof(error_path));
 }
 
 bool fs_copy_recursive_with_options(const char *src_path, const char *dest_path,
                                     const FsCopyOptions *options,
+                                    const FsCopyCallbacks *callbacks,
                                     char *error_path, size_t error_path_size) {
     struct stat destination_stat;
     bool destination_existed;
-    FsCopyOptions defaults = { false, true, NULL, NULL, NULL, NULL };
+    FsCopyOptions defaults = { false, true };
     const FsCopyOptions *effective_options = options ? options : &defaults;
 
     if (!src_path || !dest_path || !*src_path || !*dest_path ||
@@ -603,7 +607,8 @@ bool fs_copy_recursive_with_options(const char *src_path, const char *dest_path,
         return false;
     }
     destination_existed = lstat(dest_path, &destination_stat) == 0;
-    if (!copy_tree(src_path, dest_path, effective_options, error_path, error_path_size, 0)) {
+    if (!copy_tree(src_path, dest_path, effective_options, callbacks,
+                   error_path, error_path_size, 0)) {
         if (effective_options->rollback_on_error && !destination_existed) {
             int saved_errno = errno;
             remove_tree(dest_path, NULL, 0);

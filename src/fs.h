@@ -32,11 +32,14 @@ typedef enum {
 typedef struct {
     bool follow_symlinks;
     bool rollback_on_error;
+} FsCopyOptions;
+
+typedef struct {
     bool (*progress)(uint64_t bytes_copied, uint64_t total_bytes, void *context);
     bool (*is_cancelled)(void *context);
     void (*file_complete)(void *context);
     void *progress_context;
-} FsCopyOptions;
+} FsCopyCallbacks;
 
 void fs_init_dir_list(DirectoryList *list);
 void fs_free_dir_list(DirectoryList *list);
@@ -52,6 +55,7 @@ bool fs_rename(const char *old_path, const char *new_path);
 bool fs_copy_recursive(const char *src_path, const char *dest_path);
 bool fs_copy_recursive_with_options(const char *src_path, const char *dest_path,
                                     const FsCopyOptions *options,
+                                    const FsCopyCallbacks *callbacks,
                                     char *error_path, size_t error_path_size);
 
 #endif // FS_H
