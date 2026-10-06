@@ -3,6 +3,17 @@
 #include <stdbool.h>
 #include <string.h>
 
+/* Nerd Font glyphs: Font Awesome fa-file-image-o (U+F03E). */
+static const char icon_image[] = "\xEF\x80\xBE";
+/* Nerd Font glyph: Font Awesome fa-file-archive-o (U+F1C6). */
+static const char icon_archive[] = "\xEF\x87\x86";
+/* Nerd Font glyph: Font Awesome fa-link (U+F0C1). */
+static const char icon_symlink[] = "\xEF\x83\x81";
+/* Nerd Font glyph: Font Awesome fa-folder (U+F07B). */
+static const char icon_directory[] = "\xEF\x81\xBB";
+/* Nerd Font glyph: Font Awesome fa-gear (U+F013), used for executables. */
+static const char icon_executable[] = "\xEF\x80\x93";
+
 static bool extension_is(const char *ext, const char *const *extensions, size_t count) {
     if (!ext || !*ext) {
         return false;
@@ -29,20 +40,20 @@ typedef struct {
 } ExtensionTheme;
 
 static const ExtensionTheme extension_themes[] = {
-    { ".png",  THEME_PAIR_IMAGE,   "\xEF\x80\xBE" },
-    { ".jpg",  THEME_PAIR_IMAGE,   "\xEF\x80\xBE" },
-    { ".jpeg", THEME_PAIR_IMAGE,   "\xEF\x80\xBE" },
-    { ".gif",  THEME_PAIR_IMAGE,   "\xEF\x80\xBE" },
-    { ".bmp",  THEME_PAIR_IMAGE,   "\xEF\x80\xBE" },
-    { ".webp", THEME_PAIR_IMAGE,   "\xEF\x80\xBE" },
-    { ".svg",  THEME_PAIR_IMAGE,   "\xEF\x80\xBE" },
-    { ".zip",  THEME_PAIR_ARCHIVE, "\xEF\x87\x86" },
-    { ".tar",  THEME_PAIR_ARCHIVE, "\xEF\x87\x86" },
-    { ".gz",   THEME_PAIR_ARCHIVE, "\xEF\x87\x86" },
-    { ".bz2",  THEME_PAIR_ARCHIVE, "\xEF\x87\x86" },
-    { ".xz",   THEME_PAIR_ARCHIVE, "\xEF\x87\x86" },
-    { ".7z",   THEME_PAIR_ARCHIVE, "\xEF\x87\x86" },
-    { ".rar",  THEME_PAIR_ARCHIVE, "\xEF\x87\x86" }
+    { ".png",  THEME_PAIR_IMAGE,   icon_image },
+    { ".jpg",  THEME_PAIR_IMAGE,   icon_image },
+    { ".jpeg", THEME_PAIR_IMAGE,   icon_image },
+    { ".gif",  THEME_PAIR_IMAGE,   icon_image },
+    { ".bmp",  THEME_PAIR_IMAGE,   icon_image },
+    { ".webp", THEME_PAIR_IMAGE,   icon_image },
+    { ".svg",  THEME_PAIR_IMAGE,   icon_image },
+    { ".zip",  THEME_PAIR_ARCHIVE, icon_archive },
+    { ".tar",  THEME_PAIR_ARCHIVE, icon_archive },
+    { ".gz",   THEME_PAIR_ARCHIVE, icon_archive },
+    { ".bz2",  THEME_PAIR_ARCHIVE, icon_archive },
+    { ".xz",   THEME_PAIR_ARCHIVE, icon_archive },
+    { ".7z",   THEME_PAIR_ARCHIVE, icon_archive },
+    { ".rar",  THEME_PAIR_ARCHIVE, icon_archive }
 };
 
 static FileTheme theme_for_extension(const char *ext) {
@@ -63,13 +74,13 @@ FileTheme get_file_color_and_icon(mode_t mode, const char *ext) {
 
     if (S_ISLNK(mode)) {
         theme.color_pair = THEME_PAIR_SYMLINK;
-        theme.icon = "\xEF\x83\x81";
+        theme.icon = icon_symlink;
     } else if (S_ISDIR(mode)) {
         theme.color_pair = THEME_PAIR_DIRECTORY;
-        theme.icon = "\xEF\x81\xBB";
+        theme.icon = icon_directory;
     } else if ((mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0) {
         theme.color_pair = THEME_PAIR_EXECUTABLE;
-        theme.icon = "\xEF\x80\x93";
+        theme.icon = icon_executable;
     } else {
         theme = theme_for_extension(ext);
     }

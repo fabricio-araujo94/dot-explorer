@@ -23,3 +23,7 @@ Um gerenciador de arquivos para terminal rápido, leve e moderno, escrito em C u
 make
 ./dot-explorer
 ```
+
+## Headers
+
+Headers de implementação e contratos entre módulos ficam em `src/` e são internos ao aplicativo. `include/` fica reservado para uma API pública destinada a consumidores externos; o projeto atualmente não expõe uma API desse tipo.
