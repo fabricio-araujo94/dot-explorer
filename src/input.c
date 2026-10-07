@@ -119,7 +119,10 @@ static void filter_prompt(AppState *state, const InputCallbacks *cb) {
             cb->render_filter_prompt(state->filter_query, cb->userdata);
         }
         ch = cb->get_char(cb->userdata);
-        if (ch == 27 || ch == -1) { /* 27 = ESC */
+        if (ch == -1) {
+            continue;
+        }
+        if (ch == 27) {
             state->filter_active = false;
             state->filter_query[0] = '\0';
             filtered_index_list_clear(&state->filtered_entries);

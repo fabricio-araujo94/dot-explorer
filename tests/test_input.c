@@ -564,8 +564,8 @@ static void test_filter_prompt_interactive(void) {
     memset(&cb, 0, sizeof(cb));
     init_mock_context(&ctx, &icb);
 
-    /* Simulate typing 'a', 'p', '\n' */
-    int keys[] = { 'a', 'p', '\n' };
+    /* A timed-out read is ignored while typing continues. */
+    int keys[] = { -1, 'a', 'p', '\n' };
     ctx.key_stream = keys;
     ctx.key_stream_len = sizeof(keys) / sizeof(keys[0]);
     ctx.key_stream_pos = 0;
