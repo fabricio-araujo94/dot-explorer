@@ -58,35 +58,200 @@ static bool parent_is_writable(const char *path) {
     return access(parent, W_OK | X_OK) == 0;
 }
 
-static bool destination_is_inside_source(const char *source, const char *destination) {
+static bool path_separator(char character) {
+    return character == '/' || character == '\\';
+}
+
+static void trim_trailing_separators(char *path) {
+    size_t length = strlen(path);
+    while (length > 1 && path_separator(path[length - 1])) {
+#ifdef _WIN32
+        if (length == 3 && path[1] == ':') break;
+#endif
+        path[--length] = '\0';
+    }
+}
+
+static bool take_last_path_component(char *path, char *component,
+                                     size_t component_size) {
+    const char *separator;
+    size_t component_length;
+
+    trim_trailing_separators(path);
+    if (strcmp(path, ".") == 0 || strcmp(path, "..") == 0) {
+        errno = ENOENT;
+        return false;
+    }
+    separator = path_find_last_separator(path);
+    if (!separator) {
+        component_length = strlen(path);
+        if (component_length >= component_size) {
+            errno = ENAMETOOLONG;
+            return false;
+        }
+        memcpy(component, path, component_length + 1);
+        strcpy(path, ".");
+        return true;
+    }
+    component_length = strlen(separator + 1);
+    if (component_length >= component_size) {
+        errno = ENAMETOOLONG;
+        return false;
+    }
+    memcpy(component, separator + 1, component_length + 1);
+    if (separator == path) {
+        path[1] = '\0';
+#ifdef _WIN32
+    } else if (separator == path + 2 && path[1] == ':') {
+        path[3] = '\0';
+#endif
+    } else {
+        *((char *)separator) = '\0';
+    }
+    return true;
+}
+
+static bool prepend_path_component(char *suffix, size_t suffix_size,
+                                   const char *component) {
+    char combined[PATH_MAX];
+
+    if (!*suffix) {
+        int written = snprintf(suffix, suffix_size, "%s", component);
+        if (written < 0 || (size_t)written >= suffix_size) {
+            errno = ENAMETOOLONG;
+            return false;
+        }
+        return true;
+    }
+    if (!path_join(combined, sizeof(combined), component, suffix)) {
+        return false;
+    }
+    if (strlen(combined) >= suffix_size) {
+        errno = ENAMETOOLONG;
+        return false;
+    }
+    strcpy(suffix, combined);
+    return true;
+}
+
+static void remove_last_path_component(char *path) {
+    const char *separator;
+
+    trim_trailing_separators(path);
+    if (strcmp(path, "/") == 0 || strcmp(path, "\\") == 0) return;
+#ifdef _WIN32
+    if (strlen(path) == 3 && path[1] == ':' && path_separator(path[2])) return;
+#endif
+    separator = path_find_last_separator(path);
+    if (!separator) {
+        strcpy(path, ".");
+    } else if (separator == path) {
+        path[1] = '\0';
+#ifdef _WIN32
+    } else if (separator == path + 2 && path[1] == ':') {
+        path[3] = '\0';
+#endif
+    } else {
+        *((char *)separator) = '\0';
+    }
+}
+
+static bool append_normalized_suffix(char *path, size_t path_size,
+                                     const char *suffix) {
+    const char *component = suffix;
+
+    while (*component) {
+        char name[PATH_MAX];
+        char joined[PATH_MAX];
+        const char *start;
+        size_t length;
+
+        while (path_separator(*component)) component++;
+        if (!*component) break;
+        start = component;
+        while (*component && !path_separator(*component)) component++;
+        length = (size_t)(component - start);
+        if (length == 1 && start[0] == '.') continue;
+        if (length == 2 && start[0] == '.' && start[1] == '.') {
+            remove_last_path_component(path);
+            continue;
+        }
+        if (length >= sizeof(name)) {
+            errno = ENAMETOOLONG;
+            return false;
+        }
+        memcpy(name, start, length);
+        name[length] = '\0';
+        if (!path_join(joined, sizeof(joined), path, name)) {
+            return false;
+        }
+        if (strlen(joined) >= path_size) {
+            errno = ENAMETOOLONG;
+            return false;
+        }
+        strcpy(path, joined);
+    }
+    return true;
+}
+
+static bool resolve_destination_path(const char *destination, char *resolved,
+                                     size_t resolved_size) {
+    char candidate[PATH_MAX];
+    char suffix[PATH_MAX] = "";
+    char component[PATH_MAX];
+    struct stat st;
+    size_t length;
+
+    length = strlen(destination);
+    if (length >= sizeof(candidate)) {
+        errno = ENAMETOOLONG;
+        return false;
+    }
+    memcpy(candidate, destination, length + 1);
+
+    while (stat(candidate, &st) != 0) {
+        if (errno != ENOENT && errno != ENOTDIR) {
+            return false;
+        }
+        if (!take_last_path_component(candidate, component, sizeof(component)) ||
+            !prepend_path_component(suffix, sizeof(suffix), component)) {
+            return false;
+        }
+    }
+    if (!platform_realpath(candidate, resolved, resolved_size)) {
+        return false;
+    }
+    return append_normalized_suffix(resolved, resolved_size, suffix);
+}
+
+static int destination_is_inside_source(const char *source, const char *destination,
+                                        const FsCopyOptions *options) {
     struct stat source_stat;
     char source_real[PATH_MAX];
-    char parent[PATH_MAX];
-    char parent_real[PATH_MAX];
-    const char *separator;
+    char destination_real[PATH_MAX];
     size_t source_length;
+    size_t destination_length;
+    int stat_result;
 
-    if (lstat(source, &source_stat) != 0 || !S_ISDIR(source_stat.st_mode) ||
-        !platform_realpath(source, source_real, sizeof(source_real)) ||
-        strlen(destination) >= sizeof(parent)) {
-        return false;
+    stat_result = options && options->follow_symlinks ?
+                  stat(source, &source_stat) : lstat(source, &source_stat);
+    if (stat_result != 0 || !S_ISDIR(source_stat.st_mode)) {
+        return 0;
     }
-    strcpy(parent, destination);
-    separator = path_find_last_separator(parent);
-    if (!separator) {
-        strcpy(parent, ".");
-    } else if (separator == parent) {
-        parent[1] = '\0';
-    } else {
-        parent[separator - parent] = '\0';
-    }
-    if (!platform_realpath(parent, parent_real, sizeof(parent_real))) {
-        return false;
+    if (!platform_realpath(source, source_real, sizeof(source_real)) ||
+        !resolve_destination_path(destination, destination_real,
+                                  sizeof(destination_real))) {
+        return -1;
     }
     source_length = strlen(source_real);
-    return strncmp(parent_real, source_real, source_length) == 0 &&
-           (parent_real[source_length] == '\0' ||
-            parent_real[source_length] == '/' || parent_real[source_length] == '\\');
+    destination_length = strlen(destination_real);
+    if (destination_length < source_length ||
+        strncmp(destination_real, source_real, source_length) != 0) {
+        return 0;
+    }
+    return destination_length == source_length ||
+           path_separator(source_real[source_length - 1]) ||
+           path_separator(destination_real[source_length]);
 }
 
 static bool remove_tree(const char *path, char *error_path, size_t error_path_size) {
@@ -583,6 +748,7 @@ bool fs_copy_recursive_with_options(const char *src_path, const char *dest_path,
                                     char *error_path, size_t error_path_size) {
     struct stat destination_stat;
     bool destination_existed;
+    int destination_containment;
     FsCopyOptions defaults = { false, true };
     const FsCopyOptions *effective_options = options ? options : &defaults;
 
@@ -599,7 +765,15 @@ bool fs_copy_recursive_with_options(const char *src_path, const char *dest_path,
         set_error_path(error_path, error_path_size, src_path);
         return false;
     }
-    if (destination_is_inside_source(src_path, dest_path)) {
+    destination_containment = destination_is_inside_source(
+        src_path, dest_path, effective_options);
+    if (destination_containment < 0) {
+        int saved_errno = errno;
+        set_error_path(error_path, error_path_size, dest_path);
+        errno = saved_errno;
+        return false;
+    }
+    if (destination_containment > 0) {
         errno = EINVAL;
         set_error_path(error_path, error_path_size, dest_path);
         return false;

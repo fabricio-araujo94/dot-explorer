@@ -112,10 +112,19 @@ static void test_copy_into_itself(void) {
     assert(!fs_copy_recursive_with_options(source, source, &options, NULL,
                                            error_path, sizeof(error_path)));
     make_path(nested, sizeof(nested), "folder");
-    assert(platform_mkdir(nested, 0700) == 0);
+    errno = 0;
     assert(!fs_copy_recursive_with_options(TEST_ROOT, nested, &options, NULL,
                                            error_path, sizeof(error_path)));
-    assert(access(nested, F_OK) == 0);
+    assert(errno == EINVAL);
+    assert(access(nested, F_OK) != 0);
+
+    make_path(nested, sizeof(nested), "folder/subdir/deep");
+    errno = 0;
+    assert(!fs_copy_recursive_with_options(TEST_ROOT, nested, &options, NULL,
+                                           error_path, sizeof(error_path)));
+    assert(errno == EINVAL);
+    make_path(nested, sizeof(nested), "folder");
+    assert(access(nested, F_OK) != 0);
     teardown();
 }
 
