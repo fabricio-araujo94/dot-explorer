@@ -100,6 +100,7 @@ bool task_init(Task *task) {
 }
 
 void task_cleanup(Task *task) {
+    if (!task) return;
     if (task_is_running(task)) {
         task_request_cancel(task);
     }
@@ -191,6 +192,7 @@ bool task_is_running(Task *task) {
 
 void task_snapshot(Task *task, TaskStatus *status, uint64_t *bytes_copied,
                    uint64_t *total_bytes, char *error_path, size_t error_size) {
+    if (!task) return;
     pthread_mutex_lock(&task->mutex);
     if (status) *status = task->status;
     if (bytes_copied) *bytes_copied = task->bytes_copied + task->current_file_bytes;
