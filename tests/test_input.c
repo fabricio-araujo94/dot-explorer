@@ -268,6 +268,49 @@ static void test_history_navigation_keys(void) {
     teardown_env();
 }
 
+static void test_history_navigation_failure_preserves_selection(void) {
+    AppState state;
+    Clipboard clipboard;
+    MockUIContext context;
+    InputCallbacks callbacks;
+    char current_file[PATH_MAX];
+    char deleted_directory[PATH_MAX];
+    int file_index = -1;
+
+    setup_env();
+    path_join(current_file, sizeof(current_file), TEST_INPUT_ROOT, "current.txt");
+    path_join(deleted_directory, sizeof(deleted_directory), TEST_INPUT_ROOT, "deleted");
+    write_file(current_file, "current");
+    assert(platform_mkdir(deleted_directory, 0700) == 0);
+    assert(state_init(&state));
+    assert(state_change_dir(&state, TEST_INPUT_ROOT));
+    memset(&clipboard, 0, sizeof(clipboard));
+    init_mock_context(&context, &callbacks);
+
+    for (size_t i = 0; i < state.dir_list.count; ++i) {
+        if (strcmp(state.dir_list.entries[i].name, "current.txt") == 0) {
+            file_index = (int)i;
+            break;
+        }
+    }
+    assert(file_index >= 0);
+    state.selected_index = file_index;
+    assert(history_push(&state, deleted_directory, 0));
+    assert(fs_delete_recursive(deleted_directory));
+
+    input_handle(&state, &clipboard,
+                 input_key_event(DOT_KEY_HISTORY_BACK), &callbacks);
+
+    assert(strcmp(state.current_path, TEST_INPUT_ROOT) == 0);
+    assert(state.selected_index == file_index);
+    assert(context.message_count == 1);
+    assert(strcmp(context.last_message_title, "Navigation failed") == 0);
+    assert(strstr(context.last_message_body, deleted_directory) != NULL);
+
+    state_cleanup(&state);
+    teardown_env();
+}
+
 static void test_refresh_key(void) {
     AppState state;
     Clipboard cb;
@@ -622,6 +665,7 @@ int main(void) {
     test_navigation_and_selection();
     test_enter_open_and_back();
     test_history_navigation_keys();
+    test_history_navigation_failure_preserves_selection();
     test_refresh_key();
     test_sorting_commands();
     test_clipboard_copy_cut_paste_multi();

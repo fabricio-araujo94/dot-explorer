@@ -46,7 +46,8 @@ static bool is_navigation_entry(const FileEntry *entry) {
                      strcmp(entry->name, "..") == 0);
 }
 
-static void navigate_history(AppState *state, bool forward) {
+static void navigate_history(AppState *state, bool forward,
+                             const InputCallbacks *callbacks) {
     char path[PATH_MAX];
     int selected_index;
     bool restored;
@@ -59,7 +60,12 @@ static void navigate_history(AppState *state, bool forward) {
     if (!restored) {
         return;
     }
-    state_change_dir(state, path);
+    if (!state_change_dir(state, path)) {
+        char message[PATH_MAX + 64];
+        snprintf(message, sizeof(message), "%s: %s", path, strerror(errno));
+        cb_show_message(callbacks, "Navigation failed", message);
+        return;
+    }
     if (state->dir_list.count > 0) {
         if (selected_index < 0) selected_index = 0;
         if ((size_t)selected_index >= state->dir_list.count) {
@@ -257,16 +263,14 @@ static void handle_back_action(AppState *state, Clipboard *clipboard, const Inpu
 
 static void handle_history_back_action(AppState *state, Clipboard *clipboard, const InputCallbacks *callbacks, int ch) {
     (void)clipboard;
-    (void)callbacks;
     (void)ch;
-    navigate_history(state, false);
+    navigate_history(state, false, callbacks);
 }
 
 static void handle_history_forward_action(AppState *state, Clipboard *clipboard, const InputCallbacks *callbacks, int ch) {
     (void)clipboard;
-    (void)callbacks;
     (void)ch;
-    navigate_history(state, true);
+    navigate_history(state, true, callbacks);
 }
 
 static void handle_refresh_action(AppState *state, Clipboard *clipboard, const InputCallbacks *callbacks, int ch) {
