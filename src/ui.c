@@ -279,16 +279,30 @@ static void draw_task_status_bar(const DualPaneUI *ui, int max_y, int max_x) {
     TaskStatus status;
     uint64_t copied, total;
     char error_path[PATH_MAX];
+
+    if (max_y <= 0 || max_x <= 0) return;
     task_snapshot((Task *)&ui->task, &status, &copied, &total,
                   error_path, sizeof(error_path));
     if (status == TASK_RUNNING) {
-        int width = max_x > 4 ? max_x - 4 : 1;
-        int filled = total > 0 ? (int)((copied * (uint64_t)width) / total) : 0;
-        if (filled > width) filled = width;
-        mvprintw(max_y - 1, 1, "Copy [");
-        mvhline(max_y - 1, 7, '#', filled);
-        mvhline(max_y - 1, 7 + filled, '-', width - filled);
-        mvprintw(max_y - 1, 8 + width, "] Esc cancel");
+        const char prefix[] = "Copy [";
+        const char suffix[] = "] Esc cancel";
+        int prefix_x = 1;
+        int bar_x = prefix_x + (int)(sizeof(prefix) - 1);
+        int suffix_length = (int)(sizeof(suffix) - 1);
+        int width = max_x - bar_x - 1 - suffix_length;
+
+        if (width < 1) {
+            mvaddnstr(max_y - 1, 0, "Copy", max_x);
+            return;
+        }
+
+        int filled = total == 0 ? 0 :
+                     copied >= total ? width :
+                     (int)((long double)copied * width / total);
+        mvaddnstr(max_y - 1, prefix_x, prefix, (int)(sizeof(prefix) - 1));
+        mvhline(max_y - 1, bar_x, '#', filled);
+        mvhline(max_y - 1, bar_x + filled, '-', width - filled);
+        mvaddnstr(max_y - 1, bar_x + width + 1, suffix, suffix_length);
     } else if (status == TASK_FAILED) {
         mvprintw(max_y - 1, 1, "Copy failed: %.*s", max_x - 3, error_path);
     } else if (status == TASK_CANCELLED) {

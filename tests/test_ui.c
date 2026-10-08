@@ -188,6 +188,36 @@ static void test_running_task_esc_cancels(void) {
     teardown_env();
 }
 
+static void test_running_status_bar_fits_screen(void) {
+    FILE *input = tmpfile();
+    FILE *output = tmpfile();
+    SCREEN *screen;
+    DualPaneUI ui;
+
+    assert(input != NULL);
+    assert(output != NULL);
+    screen = newterm("xterm", output, input);
+    assert(screen != NULL);
+    set_term(screen);
+    assert(resizeterm(12, 24) != ERR);
+    assert(ui_dual_init(&ui));
+
+    pthread_mutex_lock(&ui.task.mutex);
+    ui.task.status = TASK_RUNNING;
+    ui.task.bytes_copied = 50;
+    ui.task.total_bytes = 100;
+    pthread_mutex_unlock(&ui.task.mutex);
+
+    ui_draw(&ui);
+    assert((mvwinch(stdscr, 11, 23) & A_CHARTEXT) == 'l');
+
+    ui_dual_cleanup(&ui);
+    endwin();
+    delscreen(screen);
+    fclose(output);
+    fclose(input);
+}
+
 static void test_sync_paste_cut_operation(void) {
     DualPaneUI ui;
     char dir_left[PATH_MAX], dir_right[PATH_MAX], src_file[PATH_MAX], dest_file[PATH_MAX];
@@ -250,6 +280,7 @@ int main(void) {
     test_input_delegation_to_active_pane();
     test_async_paste_task_creation_and_reconciliation();
     test_running_task_esc_cancels();
+    test_running_status_bar_fits_screen();
     test_sync_paste_cut_operation();
     test_theme_and_file_icons();
 
