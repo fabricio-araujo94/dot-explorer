@@ -181,6 +181,43 @@ static void test_navigation_and_selection(void) {
     teardown_env();
 }
 
+static void test_selection_advances_within_filter(void) {
+    AppState state;
+    Clipboard clipboard;
+    MockUIContext context;
+    InputCallbacks callbacks;
+    char apple_path[PATH_MAX];
+    char banana_path[PATH_MAX];
+    char grape_path[PATH_MAX];
+
+    setup_env();
+    assert(path_join(apple_path, sizeof(apple_path), TEST_INPUT_ROOT, "apple.txt"));
+    assert(path_join(banana_path, sizeof(banana_path), TEST_INPUT_ROOT, "banana.txt"));
+    assert(path_join(grape_path, sizeof(grape_path), TEST_INPUT_ROOT, "grape.txt"));
+    write_file(apple_path, "apple");
+    write_file(banana_path, "banana");
+    write_file(grape_path, "grape");
+
+    assert(state_init(&state));
+    assert(state_change_dir(&state, TEST_INPUT_ROOT));
+    memset(&clipboard, 0, sizeof(clipboard));
+    init_mock_context(&context, &callbacks);
+    assert(filter_entries("ap", &state.dir_list, &state.filtered_entries));
+    assert(state.filtered_entries.count == 2);
+    assert(state.filtered_entries.indices[1] > state.filtered_entries.indices[0] + 1);
+    state.filter_active = true;
+    strcpy(state.filter_query, "ap");
+    state.selected_index = state.filtered_entries.indices[0];
+
+    input_handle(&state, &clipboard, input_key_event(DOT_KEY_SELECT), &callbacks);
+
+    assert(state.dir_list.entries[state.filtered_entries.indices[0]].is_selected);
+    assert(state.selected_index == state.filtered_entries.indices[1]);
+
+    state_cleanup(&state);
+    teardown_env();
+}
+
 static void test_enter_open_and_back(void) {
     AppState state;
     Clipboard cb;
@@ -663,6 +700,7 @@ static void test_edge_cases(void) {
 int main(void) {
     test_quit_command();
     test_navigation_and_selection();
+    test_selection_advances_within_filter();
     test_enter_open_and_back();
     test_history_navigation_keys();
     test_history_navigation_failure_preserves_selection();

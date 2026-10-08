@@ -292,13 +292,7 @@ static void handle_select_action(AppState *state, Clipboard *clipboard, const In
     int list_height = cb_get_list_height(callbacks);
     FileEntry *entry = &state->dir_list.entries[state->selected_index];
     entry->is_selected = !entry->is_selected;
-    if (state->selected_index >= 0 &&
-        (size_t)state->selected_index < state->dir_list.count - 1) {
-        state->selected_index++;
-        if (state->selected_index >= state->scroll_offset + list_height) {
-            state->scroll_offset = state->selected_index - list_height + 1;
-        }
-    }
+    move_visible_selection(state, current_view_index(state) + 1, list_height);
 }
 
 static void handle_delete_selected_items(AppState *state, const InputCallbacks *callbacks,
