@@ -369,7 +369,7 @@ static int ui_input_get_list_height(void *userdata) {
     int max_y, max_x;
     getmaxyx(stdscr, max_y, max_x);
     (void)max_x;
-    return max_y - 1;
+    return max_y > 2 ? max_y - 2 : 1;
 }
 
 static bool ui_input_open_file(const char *path, void *userdata) {

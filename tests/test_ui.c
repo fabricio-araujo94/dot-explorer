@@ -218,6 +218,45 @@ static void test_running_status_bar_fits_screen(void) {
     fclose(input);
 }
 
+static void test_selection_stays_in_visible_rows(void) {
+    FILE *input = tmpfile();
+    FILE *output = tmpfile();
+    SCREEN *screen;
+    DualPaneUI ui;
+    char entry_path[PATH_MAX];
+
+    assert(input != NULL);
+    assert(output != NULL);
+    setup_env();
+    for (int i = 0; i < 4; ++i) {
+        char name[32];
+        snprintf(name, sizeof(name), "entry_%d.txt", i);
+        assert(path_join(entry_path, sizeof(entry_path), TEST_UI_ROOT, name));
+        write_file(entry_path, "item");
+    }
+
+    screen = newterm("xterm", output, input);
+    assert(screen != NULL);
+    set_term(screen);
+    assert(resizeterm(5, 30) != ERR);
+    assert(ui_dual_init(&ui));
+    assert(state_change_dir(&ui.panes[0].state, TEST_UI_ROOT));
+    assert(ui.panes[0].state.dir_list.count >= 4);
+
+    for (int i = 0; i < 3; ++i) {
+        ui_handle_input(&ui, KEY_DOWN);
+    }
+    assert(ui.panes[0].state.selected_index >= ui.panes[0].state.scroll_offset);
+    assert(ui.panes[0].state.selected_index < ui.panes[0].state.scroll_offset + 3);
+
+    ui_dual_cleanup(&ui);
+    endwin();
+    delscreen(screen);
+    fclose(output);
+    fclose(input);
+    teardown_env();
+}
+
 static void test_sync_paste_cut_operation(void) {
     DualPaneUI ui;
     char dir_left[PATH_MAX], dir_right[PATH_MAX], src_file[PATH_MAX], dest_file[PATH_MAX];
@@ -281,6 +320,7 @@ int main(void) {
     test_async_paste_task_creation_and_reconciliation();
     test_running_task_esc_cancels();
     test_running_status_bar_fits_screen();
+    test_selection_stays_in_visible_rows();
     test_sync_paste_cut_operation();
     test_theme_and_file_icons();
 
