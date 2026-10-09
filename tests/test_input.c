@@ -541,6 +541,89 @@ static void test_rename_and_delete_multi(void) {
     teardown_env();
 }
 
+static void set_unjoinable_current_path(AppState *state) {
+    memset(state->current_path, 'x', sizeof(state->current_path) - 1);
+    state->current_path[sizeof(state->current_path) - 1] = '\0';
+}
+
+static void test_path_join_failures_block_mutations(void) {
+    AppState state;
+    Clipboard clipboard;
+    MockUIContext context;
+    InputCallbacks callbacks;
+    char original_path[PATH_MAX];
+    char multi_path[PATH_MAX];
+    char created_file[PATH_MAX];
+    char created_directory[PATH_MAX];
+    char renamed_path[PATH_MAX];
+    int original_index = -1;
+    int multi_index = -1;
+
+    setup_env();
+    assert(path_join(original_path, sizeof(original_path), TEST_INPUT_ROOT, "original.txt"));
+    assert(path_join(multi_path, sizeof(multi_path), TEST_INPUT_ROOT, "multi.txt"));
+    assert(path_join(created_file, sizeof(created_file), TEST_INPUT_ROOT, "created.txt"));
+    assert(path_join(created_directory, sizeof(created_directory), TEST_INPUT_ROOT, "created-dir"));
+    assert(path_join(renamed_path, sizeof(renamed_path), TEST_INPUT_ROOT, "renamed.txt"));
+    write_file(original_path, "keep original");
+    write_file(multi_path, "keep multi");
+
+    assert(state_init(&state));
+    assert(state_change_dir(&state, TEST_INPUT_ROOT));
+    memset(&clipboard, 0, sizeof(clipboard));
+    init_mock_context(&context, &callbacks);
+    for (size_t i = 0; i < state.dir_list.count; ++i) {
+        if (strcmp(state.dir_list.entries[i].name, "original.txt") == 0) {
+            original_index = (int)i;
+        } else if (strcmp(state.dir_list.entries[i].name, "multi.txt") == 0) {
+            multi_index = (int)i;
+        }
+    }
+    assert(original_index >= 0);
+    assert(multi_index >= 0);
+
+    snprintf(context.prompt_response, sizeof(context.prompt_response), "created.txt");
+    set_unjoinable_current_path(&state);
+    input_handle(&state, &clipboard, input_key_event(DOT_KEY_CREATE_FILE), &callbacks);
+    assert(strcmp(context.last_message_title, "Create file failed") == 0);
+    assert(access(created_file, F_OK) != 0);
+
+    context.message_count = 0;
+    snprintf(context.prompt_response, sizeof(context.prompt_response), "created-dir");
+    set_unjoinable_current_path(&state);
+    input_handle(&state, &clipboard, input_key_event(DOT_KEY_CREATE_DIR), &callbacks);
+    assert(strcmp(context.last_message_title, "Create directory failed") == 0);
+    assert(access(created_directory, F_OK) != 0);
+
+    context.message_count = 0;
+    snprintf(context.prompt_response, sizeof(context.prompt_response), "renamed.txt");
+    state.selected_index = original_index;
+    set_unjoinable_current_path(&state);
+    input_handle(&state, &clipboard, input_key_event(DOT_KEY_RENAME_ITEM), &callbacks);
+    assert(strcmp(context.last_message_title, "Rename failed") == 0);
+    assert(access(original_path, F_OK) == 0);
+    assert(access(renamed_path, F_OK) != 0);
+
+    context.message_count = 0;
+    context.prompt_response[0] = 'y';
+    context.prompt_response[1] = '\0';
+    state.selected_index = original_index;
+    set_unjoinable_current_path(&state);
+    input_handle(&state, &clipboard, input_key_event(DOT_KEY_DELETE_ITEM), &callbacks);
+    assert(strcmp(context.last_message_title, "Delete failed") == 0);
+    assert(access(original_path, F_OK) == 0);
+
+    context.message_count = 0;
+    state.dir_list.entries[multi_index].is_selected = true;
+    set_unjoinable_current_path(&state);
+    input_handle(&state, &clipboard, input_key_event(DOT_KEY_DELETE_ITEM), &callbacks);
+    assert(strcmp(context.last_message_title, "Delete failed") == 0);
+    assert(access(multi_path, F_OK) == 0);
+
+    state_cleanup(&state);
+    teardown_env();
+}
+
 static void test_navigation_entries_blocked_actions(void) {
     AppState state;
     Clipboard cb;
@@ -712,6 +795,7 @@ int main(void) {
     test_navigation_entries_blocked_actions();
     test_properties();
     test_filter_prompt_interactive();
+    test_path_join_failures_block_mutations();
     test_edge_cases();
 
     printf("test_input: all tests passed\n");

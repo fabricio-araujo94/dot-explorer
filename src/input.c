@@ -309,7 +309,13 @@ static void handle_delete_selected_items(AppState *state, const InputCallbacks *
             FileEntry *entry = &state->dir_list.entries[i];
             if (entry->is_selected && !is_navigation_entry(entry)) {
                 char full_path[PATH_MAX];
-                path_join(full_path, sizeof(full_path), state->current_path, entry->name);
+                if (!path_join(full_path, sizeof(full_path), state->current_path,
+                               entry->name)) {
+                    any_fail = true;
+                    snprintf(fail_msg, sizeof(fail_msg), "%s: %s",
+                             entry->name, strerror(errno));
+                    continue;
+                }
                 if (!fs_delete(full_path)) {
                     any_fail = true;
                     snprintf(fail_msg, sizeof(fail_msg), "%s: %s", entry->name, strerror(errno));
@@ -332,7 +338,13 @@ static void handle_delete_single_item(AppState *state, const InputCallbacks *cal
     char buf[256];
     if (cb_prompt(callbacks, "Delete item? (y/n): ", buf, sizeof(buf)) && (buf[0] == 'y' || buf[0] == 'Y')) {
         char full_path[PATH_MAX];
-        path_join(full_path, sizeof(full_path), state->current_path, entry->name);
+        if (!path_join(full_path, sizeof(full_path), state->current_path,
+                       entry->name)) {
+            char msg[PATH_MAX + 64];
+            snprintf(msg, sizeof(msg), "%s: %s", entry->name, strerror(errno));
+            cb_show_message(callbacks, "Delete failed", msg);
+            return;
+        }
         if (!fs_delete(full_path)) {
             char msg[PATH_MAX + 64];
             snprintf(msg, sizeof(msg), "%s: %s", entry->name, strerror(errno));
@@ -376,8 +388,13 @@ static void handle_rename_action(AppState *state, Clipboard *clipboard, const In
     }
     if (cb_prompt(callbacks, "New name: ", new_name, sizeof(new_name))) {
         char old_path[PATH_MAX], new_path[PATH_MAX];
-        path_join(old_path, sizeof(old_path), state->current_path, entry->name);
-        path_join(new_path, sizeof(new_path), state->current_path, new_name);
+        if (!path_join(old_path, sizeof(old_path), state->current_path, entry->name) ||
+            !path_join(new_path, sizeof(new_path), state->current_path, new_name)) {
+            char msg[PATH_MAX + 64];
+            snprintf(msg, sizeof(msg), "%s: %s", new_name, strerror(errno));
+            cb_show_message(callbacks, "Rename failed", msg);
+            return;
+        }
         if (!fs_rename(old_path, new_path)) {
             char msg[PATH_MAX + 64];
             snprintf(msg, sizeof(msg), "%s: %s", new_name, strerror(errno));
@@ -393,7 +410,12 @@ static void handle_create_file_action(AppState *state, Clipboard *clipboard, con
     char name[256];
     if (cb_prompt(callbacks, "New file name: ", name, sizeof(name))) {
         char full_path[PATH_MAX];
-        path_join(full_path, sizeof(full_path), state->current_path, name);
+        if (!path_join(full_path, sizeof(full_path), state->current_path, name)) {
+            char msg[PATH_MAX + 64];
+            snprintf(msg, sizeof(msg), "%s: %s", name, strerror(errno));
+            cb_show_message(callbacks, "Create file failed", msg);
+            return;
+        }
         if (!fs_create_file(full_path)) {
             char msg[PATH_MAX + 64];
             snprintf(msg, sizeof(msg), "%s: %s", name, strerror(errno));
@@ -409,7 +431,12 @@ static void handle_create_dir_action(AppState *state, Clipboard *clipboard, cons
     char name[256];
     if (cb_prompt(callbacks, "New directory name: ", name, sizeof(name))) {
         char full_path[PATH_MAX];
-        path_join(full_path, sizeof(full_path), state->current_path, name);
+        if (!path_join(full_path, sizeof(full_path), state->current_path, name)) {
+            char msg[PATH_MAX + 64];
+            snprintf(msg, sizeof(msg), "%s: %s", name, strerror(errno));
+            cb_show_message(callbacks, "Create directory failed", msg);
+            return;
+        }
         if (!fs_create_dir(full_path)) {
             char msg[PATH_MAX + 64];
             snprintf(msg, sizeof(msg), "%s: %s", name, strerror(errno));
