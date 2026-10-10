@@ -549,6 +549,7 @@ static const KeyBinding key_bindings[] = {
     { KEY_DOWN, handle_move_down_action },
     { '/', handle_filter_action },
     { DOT_KEY_ENTER_DIR, handle_enter_action },
+    { KEY_ENTER, handle_enter_action },
     { KEY_RIGHT, handle_enter_action },
     { DOT_KEY_BACK_DIR, handle_back_action },
     { KEY_LEFT, handle_back_action },

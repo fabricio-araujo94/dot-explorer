@@ -252,6 +252,19 @@ static void test_enter_open_and_back(void) {
     assert(strcmp(path_basename(state.current_path), "dot-explorer-input-test") == 0 ||
            strstr(state.current_path, "dot-explorer-input-test") != NULL);
 
+    /* The keypad Enter key opens directories too. */
+    for (size_t i = 0; i < state.dir_list.count; ++i) {
+        if (strcmp(state.dir_list.entries[i].name, "subfolder") == 0) {
+            state.selected_index = (int)i;
+            break;
+        }
+    }
+    input_handle(&state, &cb, input_key_event(KEY_ENTER), &icb);
+    assert(strstr(state.current_path, "subfolder") != NULL);
+    assert(state.history.back_count == 2);
+
+    input_handle(&state, &cb, input_key_event(DOT_KEY_BACK_DIR), &icb);
+
     /* Select test.txt and press KEY_RIGHT to open file */
     for (size_t i = 0; i < state.dir_list.count; ++i) {
         if (strcmp(state.dir_list.entries[i].name, "test.txt") == 0) {
