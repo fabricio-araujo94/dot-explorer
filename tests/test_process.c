@@ -1,17 +1,22 @@
 #include "process.h"
+#include "test_helpers.h"
+#include "utils/platform.h"
 
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define TEST_PROCESS_DIR "/tmp/dot-explorer-process-test"
+static char TEST_PROCESS_DIR[PATH_MAX];
 
 static void setup_env(void) {
-    mkdir(TEST_PROCESS_DIR, 0700);
+    assert(test_get_temp_dir(TEST_PROCESS_DIR, sizeof(TEST_PROCESS_DIR),
+                             "dot-explorer-process-test"));
+    assert(platform_mkdir(TEST_PROCESS_DIR, 0700) == 0);
 }
 
 static void teardown_env(void) {
@@ -33,8 +38,11 @@ static void test_process_directory_fails(void) {
 
 static void test_process_open_regular_file(void) {
     setup_env();
-    char filepath[512];
-    snprintf(filepath, sizeof(filepath), "%s/test_file.txt", TEST_PROCESS_DIR);
+    char filepath[PATH_MAX];
+    int path_length = snprintf(filepath, sizeof(filepath), "%s%c%s",
+                               TEST_PROCESS_DIR, PLATFORM_PATH_SEPARATOR,
+                               "test_file.txt");
+    assert(path_length >= 0 && (size_t)path_length < sizeof(filepath));
 
     FILE *f = fopen(filepath, "w");
     assert(f != NULL);
