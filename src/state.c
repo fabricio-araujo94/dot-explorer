@@ -183,8 +183,6 @@ static bool ensure_clipboard_capacity(Clipboard *clipboard) {
 
 bool clipboard_add_entry(Clipboard *clipboard, const char *path) {
     char absolute_path[PATH_MAX];
-    char source_dir[PATH_MAX];
-    const char *separator;
     char *copy;
 
     if (!clipboard || !path || !*path) {
@@ -209,26 +207,6 @@ bool clipboard_add_entry(Clipboard *clipboard, const char *path) {
         return false;
     }
     clipboard->paths[clipboard->count++] = copy;
-
-    if (clipboard->source_dir[0] == '\0') {
-        separator = path_find_last_separator(absolute_path);
-        if (!separator) {
-            snprintf(source_dir, sizeof(source_dir), ".");
-        } else if (separator == absolute_path) {
-            snprintf(source_dir, sizeof(source_dir), "%c", separator[0]);
-        } else {
-            size_t length = (size_t)(separator - absolute_path);
-            if (length >= sizeof(source_dir)) {
-                free(copy);
-                clipboard->count--;
-                errno = ENAMETOOLONG;
-                return false;
-            }
-            memcpy(source_dir, absolute_path, length);
-            source_dir[length] = '\0';
-        }
-        snprintf(clipboard->source_dir, sizeof(clipboard->source_dir), "%s", source_dir);
-    }
     return true;
 }
 
@@ -244,7 +222,6 @@ void clipboard_clear(Clipboard *clipboard) {
     clipboard->count = 0;
     clipboard->capacity = 0;
     clipboard->is_cut = false;
-    clipboard->source_dir[0] = '\0';
 }
 
 static void clipboard_remove_entry(Clipboard *clipboard, size_t index) {

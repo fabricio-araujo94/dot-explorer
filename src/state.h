@@ -10,7 +10,6 @@ typedef struct {
     size_t count;
     size_t capacity;
     bool is_cut;
-    char source_dir[PATH_MAX];
 } Clipboard;
 
 /** Saved navigation location and selection index. */

@@ -165,7 +165,6 @@ static void test_clipboard_lifecycle_and_errors(void) {
     assert(clipboard_add_entry(&cb, file1));
     assert(cb.count == 1);
     assert(cb.paths != NULL);
-    assert(strlen(cb.source_dir) > 0);
 
     /* Adding duplicate entry fails with EEXIST */
     errno = 0;
@@ -184,7 +183,6 @@ static void test_clipboard_lifecycle_and_errors(void) {
     assert(cb.count == 0);
     assert(cb.capacity == 0);
     assert(cb.paths == NULL);
-    assert(cb.source_dir[0] == '\0');
 
     /* Apply operation on empty clipboard fails */
     errno = 0;
