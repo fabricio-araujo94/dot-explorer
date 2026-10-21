@@ -2,7 +2,11 @@
 #include "ui.h"
 #include "input.h"
 #include <locale.h>
+#ifdef _WIN32
+#include <ncursesw/ncurses.h>
+#else
 #include <ncurses.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 

@@ -1,7 +1,12 @@
 #include "state.h"
 #include "utils.h"
 #include <errno.h>
+#ifdef _WIN32
+#include <direct.h>
+#define getcwd _getcwd
+#else
 #include <unistd.h>
+#endif
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>

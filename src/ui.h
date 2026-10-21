@@ -3,7 +3,11 @@
 
 #include "state.h"
 #include "task.h"
+#ifdef _WIN32
+#include <ncursesw/ncurses.h>
+#else
 #include <ncurses.h>
+#endif
 
 /** One pane's state and current screen geometry. */
 typedef struct {

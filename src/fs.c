@@ -5,11 +5,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <dirent.h>
+#ifdef _WIN32
+#include <io.h>
+#include <sys/types.h>
+#define lstat stat
+#else
+#include <strings.h>
 #include <unistd.h>
-#include <utime.h>
-#ifndef _WIN32
 #include <sys/types.h>
 #endif
 
@@ -269,7 +272,7 @@ static bool remove_tree(const char *path, char *error_path, size_t error_path_si
         return false;
     }
     if (!S_ISDIR(st.st_mode)) {
-        if (unlink(path) != 0) {
+        if (platform_remove_file(path) != 0) {
             set_error_path(error_path, error_path_size, path);
             return false;
         }
@@ -368,10 +371,11 @@ static bool copy_file_contents(const char *src_path, const char *dest_path,
 static bool copy_file_metadata(const char *dest_path,
                                const struct stat *source_stat,
                                char *error_path, size_t error_path_size) {
-    struct utimbuf times = { source_stat->st_atime, source_stat->st_mtime };
-
-    if (chmod(dest_path, source_stat->st_mode & 07777) != 0 ||
-        utime(dest_path, &times) != 0) {
+    /* platform_set_times must run before chmod: Windows rejects timestamp
+       updates on read-only entries, while POSIX allows either order. */
+    if (!platform_set_times(dest_path, source_stat->st_atime,
+                            source_stat->st_mtime) ||
+        chmod(dest_path, source_stat->st_mode & 07777) != 0) {
         set_error_path(error_path, error_path_size, dest_path);
         return false;
     }
@@ -507,16 +511,14 @@ static bool copy_tree(const char *src_path, const char *dest_path,
                                      error_path, error_path_size, depth)) {
             return false;
         }
-        if (chmod(dest_path, source_stat.st_mode & 07777) != 0) {
+        if (!platform_set_times(dest_path, source_stat.st_atime,
+                                source_stat.st_mtime)) {
             set_error_path(error_path, error_path_size, dest_path);
             return false;
         }
-        {
-            struct utimbuf times = { source_stat.st_atime, source_stat.st_mtime };
-            if (utime(dest_path, &times) != 0) {
-                set_error_path(error_path, error_path_size, dest_path);
-                return false;
-            }
+        if (chmod(dest_path, source_stat.st_mode & 07777) != 0) {
+            set_error_path(error_path, error_path_size, dest_path);
+            return false;
         }
         return true;
     }
@@ -638,10 +640,14 @@ static bool populate_file_entry(FileEntry *entry, const struct dirent *directory
         entry->mode = st.st_mode;
         entry->is_symlink = S_ISLNK(st.st_mode);
     } else {
+#ifdef _DIRENT_HAVE_D_TYPE
         if (directory_entry->d_type == DT_UNKNOWN) {
             return false;
         }
         entry->is_dir = directory_entry->d_type == DT_DIR;
+#else
+        return false;
+#endif
         entry->size = 0;
         entry->mtime = 0;
         entry->mode = 0;

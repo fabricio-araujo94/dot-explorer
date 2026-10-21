@@ -7,7 +7,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <io.h>
+#define lstat stat
+#ifndef S_ISLNK
+#define S_ISLNK(m) 0
+#endif
+#else
 #include <unistd.h>
+#endif
 
 static uint64_t tree_size(const char *path) {
     struct stat st;

@@ -2,6 +2,7 @@
 #define THEME_H
 
 #include <sys/stat.h>
+#include "platform.h"
 
 typedef enum ColorPair {
     THEME_PAIR_CYAN = 1,

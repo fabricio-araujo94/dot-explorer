@@ -166,7 +166,7 @@ static bool append_next_character(DrawLineState *line, int max_cols) {
         return true;
     }
 
-    int column_width = wcwidth(character);
+    int column_width = platform_wcwidth(character);
     if (column_width < 0) column_width = 0;
     if (line->columns + column_width > max_cols) {
         return false;

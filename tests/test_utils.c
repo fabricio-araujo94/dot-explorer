@@ -46,18 +46,20 @@ static void test_set_error_path(void) {
 
 static void test_path_join(void) {
     char result[PATH_MAX];
+    char expected[64];
 
     /* Standard join */
+    snprintf(expected, sizeof(expected), "/tmp%cfile.txt", PLATFORM_PATH_SEPARATOR);
     assert(path_join(result, sizeof(result), "/tmp", "file.txt"));
-    assert(strcmp(result, "/tmp/file.txt") == 0);
+    assert(strcmp(result, expected) == 0);
 
-    /* Base ending with slash */
+    /* Base ending with a separator: the existing separator is kept as-is */
     assert(path_join(result, sizeof(result), "/tmp/", "file.txt"));
     assert(strcmp(result, "/tmp/file.txt") == 0);
 
     /* Name starting with slash */
     assert(path_join(result, sizeof(result), "/tmp", "/file.txt"));
-    assert(strcmp(result, "/tmp/file.txt") == 0);
+    assert(strcmp(result, expected) == 0);
 
     /* Base empty */
     assert(path_join(result, sizeof(result), "", "file.txt"));
@@ -129,9 +131,12 @@ static void test_theme_and_icons(void) {
     assert(theme.color_pair == THEME_PAIR_DIRECTORY);
     assert(strcmp(theme.icon, "\xEF\x81\xBB") == 0);
 
-    /* Symlink */
+#ifndef _WIN32
+    /* Symlink: Windows stat() never reports symlinks, so S_ISLNK is always
+       false there and this branch is unreachable on that platform. */
     theme = get_file_color_and_icon(S_IFLNK | 0777, "");
     assert(theme.color_pair == THEME_PAIR_SYMLINK);
+#endif
 
     /* Executable file */
     theme = get_file_color_and_icon(S_IFREG | 0755, "");
