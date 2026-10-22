@@ -44,11 +44,11 @@ No Debian ou Ubuntu:
 
 ```sh
 sudo apt-get install build-essential libncurses-dev
-make
+cmake --build build
 ./dot-explorer
 ```
 
-No Windows, use o ambiente **MSYS2 MinGW-w64** com GCC, Make, ncurses e pthreads instalados. Abra o terminal MinGW-w64, execute `make` e inicie o executável produzido pelo ambiente. O workflow de CI deste repositório valida Linux com GCC e Clang; Windows não é coberto pela CI.
+No Windows, use o ambiente **MSYS2 MinGW-w64** com GCC, Make, ncurses e pthreads instalados. Abra o terminal MinGW-w64, execute `cmake --build build` e inicie o executável produzido pelo ambiente. O workflow de CI deste repositório valida Linux com GCC e Clang; Windows não é coberto pela CI.
 
 ## Organização dos Headers
 

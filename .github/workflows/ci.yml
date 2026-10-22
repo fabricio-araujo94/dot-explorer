@@ -20,19 +20,26 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libncurses-dev build-essential
+          sudo apt-get install -y libncurses-dev build-essential cmake
 
-      - name: Build and Run Tests
+      - name: Configure and Build
         env:
           CC: ${{ matrix.compiler }}
         run: |
-          make clean
-          make CFLAGS="-Wall -Wextra -Werror -std=c99 -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700 -g -I./src"
-          make test CFLAGS="-Wall -Wextra -Werror -std=c99 -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700 -g -I./src"
+          cmake -B build -S . \
+            -DCMAKE_C_FLAGS="-Wall -Wextra -Werror"
+          cmake --build build
 
-      - name: Build and Run Tests with AddressSanitizer & UndefinedBehaviorSanitizer
+      - name: Run Tests
+        run: |
+          ctest --test-dir build --output-on-failure
+
+      - name: Build and Run Tests with Sanitizers (ASan & UBSan)
         env:
           CC: ${{ matrix.compiler }}
         run: |
-          make clean
-          make test CFLAGS="-Wall -Wextra -Werror -std=c99 -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I./src" LDFLAGS="-lncursesw -pthread -fsanitize=address,undefined"
+          cmake -B build-sanitizers -S . \
+            -DCMAKE_C_FLAGS="-Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+          cmake --build build-sanitizers
+          ctest --test-dir build-sanitizers --output-on-failure
