@@ -38,7 +38,7 @@ O painel ativo é realçado. As operações de copiar, recortar e colar usam a s
 
 ## Requisitos e Compilação
 
-Requisitos: GCC ou Clang, GNU Make, `ncursesw` e suporte a pthreads.
+Requisitos: GCC ou Clang, CMake, `ncursesw` e suporte a pthreads.
 
 No Debian ou Ubuntu:
 
@@ -48,7 +48,7 @@ cmake --build build
 ./dot-explorer
 ```
 
-No Windows, use o ambiente **MSYS2 MinGW-w64** com GCC, Make, ncurses e pthreads instalados. Abra o terminal MinGW-w64, execute `cmake --build build` e inicie o executável produzido pelo ambiente. O workflow de CI deste repositório valida Linux com GCC e Clang; Windows não é coberto pela CI.
+No Windows, use o ambiente **MSYS2 MinGW-w64** com GCC, CMake, ncurses e pthreads instalados. Abra o terminal MinGW-w64, execute `cmake --build build` e inicie o executável produzido pelo ambiente. O workflow de CI deste repositório valida Linux com GCC e Clang; Windows não é coberto pela CI.
 
 ## Organização dos Headers
 
